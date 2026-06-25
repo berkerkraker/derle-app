@@ -15,6 +15,7 @@ import {
   KeyboardStickyView,
 } from "react-native-keyboard-controller";
 
+import { Icon } from "@/src/components/Icon";
 import { NoteRow } from "@/src/components/NoteRow";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
@@ -22,12 +23,16 @@ import { useNotes, selectPriorityNotes } from "@/src/context/NotesContext";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/components/Toast";
 import { useEditSheet } from "@/src/context/EditSheetContext";
-import { CATEGORIES } from "@/src/constants/categories";
+import {
+  CATEGORIES,
+  CATEGORY_ORDER,
+  resolveCategory,
+} from "@/src/constants/categories";
 import { headerDate } from "@/src/lib/format";
 import { haptics } from "@/src/lib/haptics";
 
 export default function CaptureScreen() {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const { t, lang } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -37,9 +42,28 @@ export default function CaptureScreen() {
   const { openEdit } = useEditSheet();
 
   const [text, setText] = useState("");
+  const [collapsedPriority, setCollapsedPriority] = useState<Record<string, boolean>>({});
 
   const priorityNotes = useMemo(() => selectPriorityNotes(notes), [notes]);
-  const canAdd = text.trim().length > 0 && !processing;
+
+  // Group priority notes by category in canonical order
+  const priorityGroups = useMemo(() => {
+    const map: Record<string, typeof priorityNotes> = {};
+    for (const n of priorityNotes) {
+      if (!map[n.category]) map[n.category] = [];
+      map[n.category].push(n);
+    }
+    const orderedIds = [
+      ...CATEGORY_ORDER,
+      ...customCategories.map((c) => c.id),
+    ];
+    return orderedIds
+      .filter((id) => map[id])
+      .map((id) => ({ id, items: map[id] }));
+  }, [priorityNotes, customCategories]);
+
+  // Button enabled as soon as there is text — never blocked by AI processing
+  const canAdd = text.trim().length > 0;
 
   const catLabel = (id: string) =>
     CATEGORIES[id]
@@ -48,20 +72,28 @@ export default function CaptureScreen() {
 
   const onAdd = async () => {
     const value = text.trim();
-    if (!value || processing) return;
+    if (!value) return;
     setText("");
+    haptics.light();
     const res = await addFromText(value);
     if (res.count > 0) {
       if (res.count === 1)
         show(t("capture.addedOne", { cat: catLabel(res.categories[0]) }));
       else show(t("capture.addedMany", { n: res.count }));
-      haptics.success();
     }
   };
 
+  const toggleGroup = (id: string) =>
+    setCollapsedPriority((c) => ({ ...c, [id]: !c[id] }));
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      {/* sticky top bar */}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.bg, paddingTop: insets.top },
+      ]}
+    >
+      {/* top bar */}
       <View style={styles.topBar}>
         {token ? (
           <View style={styles.backup} testID="backup-indicator">
@@ -91,8 +123,12 @@ export default function CaptureScreen() {
         bottomOffset={20}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.date, { color: colors.textMuted }]}>{headerDate(lang)}</Text>
-        <Text style={[styles.title, { color: colors.text }]}>{t("capture.title")}</Text>
+        <Text style={[styles.date, { color: colors.textMuted }]}>
+          {headerDate(lang)}
+        </Text>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {t("capture.title")}
+        </Text>
 
         <TextInput
           testID="capture-input"
@@ -102,15 +138,34 @@ export default function CaptureScreen() {
           placeholderTextColor={colors.textMuted}
           multiline
           autoFocus
-          style={[styles.input, { backgroundColor: colors.card, color: colors.inputText, borderColor: colors.cardBorder }]}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.card,
+              color: colors.inputText,
+              borderColor: colors.cardBorder,
+            },
+          ]}
         />
 
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{t("capture.priority")}</Text>
+        {/* section header with background AI indicator */}
+        <View style={styles.sectionRow}>
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+            {t("capture.priority")}
+          </Text>
+          {processing && (
+            <View style={styles.aiDot} testID="ai-processing-indicator">
+              <ActivityIndicator size="small" color={colors.brand} />
+            </View>
+          )}
+        </View>
 
-        {priorityNotes.length === 0 ? (
+        {priorityGroups.length === 0 ? (
           <View style={styles.empty} testID="capture-empty">
             <Feather name="check-circle" size={22} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.emptyTitle, { color: colors.textSecondary }]}
+            >
               {t("capture.emptyTitle")}
             </Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
@@ -118,16 +173,83 @@ export default function CaptureScreen() {
             </Text>
           </View>
         ) : (
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            {priorityNotes.map((n, i) => (
-              <NoteRow
-                key={n.id}
-                note={n}
-                onEdit={openEdit}
-                variant="capture"
-                isLast={i === priorityNotes.length - 1}
-              />
-            ))}
+          <View style={styles.groups}>
+            {priorityGroups.map(({ id, items }) => {
+              const meta = resolveCategory(id, customCategories);
+              const isOpen = !collapsedPriority[id];
+              return (
+                <View key={id} style={styles.group}>
+                  <Pressable
+                    testID={`priority-group-${id}`}
+                    style={styles.groupHeader}
+                    onPress={() => toggleGroup(id)}
+                  >
+                    <View
+                      style={[
+                        styles.groupIcon,
+                        { backgroundColor: meta.tint[scheme] },
+                      ]}
+                    >
+                      <Icon
+                        family={meta.icon.family}
+                        name={meta.icon.name}
+                        size={13}
+                        color={meta.fg[scheme]}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.groupLabel,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {catLabel(id)}
+                    </Text>
+                    <View
+                      style={[
+                        styles.groupCount,
+                        { backgroundColor: colors.input },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.groupCountText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {items.length}
+                      </Text>
+                    </View>
+                    <Feather
+                      name={isOpen ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color={colors.textMuted}
+                    />
+                  </Pressable>
+                  {isOpen && (
+                    <View
+                      style={[
+                        styles.card,
+                        {
+                          backgroundColor: colors.card,
+                          borderColor: colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      {items.map((n, i) => (
+                        <NoteRow
+                          key={n.id}
+                          note={n}
+                          onEdit={openEdit}
+                          variant="capture"
+                          isLast={i === items.length - 1}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         )}
       </KeyboardAwareScrollView>
@@ -152,25 +274,19 @@ export default function CaptureScreen() {
               { backgroundColor: canAdd ? colors.brand : colors.input },
             ]}
           >
-            {processing ? (
-              <ActivityIndicator color={canAdd ? colors.brandText : colors.textMuted} />
-            ) : (
-              <>
-                <Feather
-                  name="plus"
-                  size={20}
-                  color={canAdd ? colors.brandText : colors.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.addText,
-                    { color: canAdd ? colors.brandText : colors.textMuted },
-                  ]}
-                >
-                  {processing ? t("capture.adding") : t("capture.add")}
-                </Text>
-              </>
-            )}
+            <Feather
+              name="plus"
+              size={20}
+              color={canAdd ? colors.brandText : colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.addText,
+                { color: canAdd ? colors.brandText : colors.textMuted },
+              ]}
+            >
+              {t("capture.add")}
+            </Text>
           </Pressable>
         </View>
       </KeyboardStickyView>
@@ -224,12 +340,56 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     textAlignVertical: "top",
   },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 24,
+    marginBottom: 12,
+    gap: 8,
+  },
   sectionLabel: {
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.2,
-    marginTop: 24,
-    marginBottom: 12,
+  },
+  aiDot: {
+    width: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groups: { gap: 12 },
+  group: {},
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  groupIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groupLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.1,
+  },
+  groupCount: {
+    minWidth: 22,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groupCountText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   card: {
     borderRadius: 18,

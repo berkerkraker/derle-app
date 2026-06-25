@@ -148,29 +148,14 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
       const clean = (text || "").trim();
       if (!clean) return { count: 0, categories: [], usedAI: false };
 
-      setProcessing(true);
-      let items;
-      let usedAI = false;
-      try {
-        const res = await api.organize(clean, lang);
-        if (res.source === "ai" && res.items.length > 0) {
-          items = res.items;
-          usedAI = true;
-        } else {
-          items = organizeLocally(clean, lang);
-        }
-      } catch {
-        items = organizeLocally(clean, lang);
-      } finally {
-        setProcessing(false);
-      }
-
-      if (!items || items.length === 0) {
-        items = [{ text: clean, category: "notlar", priority: "low" as Priority }];
+      // ── 1. Instant local save — never blocks the UI ──────────────────────
+      let localItems = organizeLocally(clean, lang);
+      if (!localItems || localItems.length === 0) {
+        localItems = [{ text: clean, category: "notlar", priority: "low" as Priority }];
       }
 
       const now = Date.now();
-      const created: Note[] = items.map((it, idx) => ({
+      const created: Note[] = localItems.map((it, idx) => ({
         id: uid(),
         text: it.text,
         category: it.category,
@@ -180,14 +165,52 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         createdAt: now + idx,
         updatedAt: now + idx,
         deleted: false,
-        source: usedAI ? "ai" : "local",
+        source: "local",
       }));
 
       persist([...created, ...allRef.current]);
       scheduleSync();
 
+      const createdIds = created.map((n) => n.id);
       const cats = Array.from(new Set(created.map((n) => n.category)));
-      return { count: created.length, categories: cats, usedAI };
+
+      // ── 2. Background AI upgrade — fire-and-forget, never blocks ─────────
+      setProcessing(true);
+      api
+        .organize(clean, lang)
+        .then((res) => {
+          setProcessing(false);
+          if (res.source !== "ai" || !res.items?.length) return;
+
+          // Only replace notes the user hasn't touched yet
+          const current = allRef.current;
+          const allUntouched = createdIds.every((id) =>
+            current.some(
+              (n) => n.id === id && !n.done && !n.deleted && n.source === "local",
+            ),
+          );
+          if (!allUntouched) return;
+
+          const aiNotes: Note[] = (res.items as any[]).map((it, idx) => ({
+            id: uid(),
+            text: it.text,
+            category: it.category,
+            priority: it.priority,
+            pinned: it.priority !== "low",
+            done: false,
+            createdAt: now + idx,
+            updatedAt: Date.now() + idx,
+            deleted: false,
+            source: "ai",
+          }));
+
+          const without = current.filter((n) => !createdIds.includes(n.id));
+          persist([...aiNotes, ...without]);
+          scheduleSync();
+        })
+        .catch(() => setProcessing(false));
+
+      return { count: created.length, categories: cats, usedAI: false };
     },
     [lang, persist, scheduleSync],
   );

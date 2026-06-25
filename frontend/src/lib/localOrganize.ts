@@ -77,9 +77,18 @@ function prioritize(line: string, category: string): Priority {
 }
 
 function splitLines(text: string): string[] {
-  // Split only on clear separators: new lines and bullet markers.
+  // Split on newlines first, then commas/semicolons (list heuristic), then bullets.
   const parts = text
     .split(/\r?\n+/)
+    .flatMap((l) => {
+      // Split on comma/semicolon separators if it looks like a list
+      const byComma = l
+        .split(/[,;]\s+/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+      if (byComma.length > 1) return byComma;
+      return [l];
+    })
     .flatMap((l) => l.split(/(?:^|\s)[•·]\s+/))
     .map((l) => l.replace(/^\s*(?:[-*]|\d+[.)])\s+/, "").trim())
     .filter((l) => l.length > 0);

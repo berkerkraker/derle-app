@@ -124,7 +124,7 @@ export default function SettingsScreen() {
         bottomOffset={20}
         showsVerticalScrollIndicator={false}
       >
-        {/* THEME */}
+        {/* GÖRÜNÜM — Tema + Dil compact card */}
         <Text style={[styles.label, { color: colors.textMuted }]}>{t("settings.theme")}</Text>
         <SegmentedControl
           testIDPrefix="theme"
@@ -137,30 +137,52 @@ export default function SettingsScreen() {
           ]}
         />
 
-        {/* LANGUAGE */}
-        <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
-          {t("settings.language")}
-        </Text>
-        <SegmentedControl
-          testIDPrefix="lang"
-          value={lang}
-          onChange={(v) => setLang(v as any)}
-          options={[
-            { label: "Türkçe", value: "tr" },
-            { label: "English", value: "en" },
-          ]}
-        />
+        {/* LANGUAGE — compact inline pill toggle */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder, marginTop: 14 }]}>
+          <View style={styles.compactRow}>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>
+              {t("settings.language")} / Language
+            </Text>
+            <View style={styles.langToggle}>
+              {(["tr", "en"] as const).map((v) => (
+                <Pressable
+                  key={v}
+                  testID={`lang-${v}`}
+                  onPress={() => setLang(v)}
+                  style={[
+                    styles.langPill,
+                    {
+                      backgroundColor:
+                        lang === v ? colors.brand : colors.input,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.langPillText,
+                      {
+                        color:
+                          lang === v ? colors.brandText : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {v === "tr" ? "TR" : "EN"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>
 
-        {/* GENERAL */}
+        {/* GENEL — Haptics compact */}
         <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
           {t("settings.general")}
         </Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.switchLabel, { color: colors.text }]}>{t("settings.haptics")}</Text>
-              <Text style={[styles.subText, { color: colors.textMuted }]}>{t("settings.hapticsSub")}</Text>
-            </View>
+          <View style={styles.compactRow}>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>
+              {t("settings.haptics")}
+            </Text>
             <Switch
               testID="haptics-toggle"
               value={hapticsOn}
@@ -435,6 +457,33 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 16,
+  },
+  compactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  rowLabel: {
+    fontSize: 15,
+    fontWeight: "500",
+    flex: 1,
+  },
+  langToggle: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  langPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  langPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
   accountRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
