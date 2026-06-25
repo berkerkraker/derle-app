@@ -6,7 +6,6 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -22,7 +21,7 @@ import { useNotes } from "@/src/context/NotesContext";
 import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/components/Toast";
 import { storage } from "@/src/utils/storage";
-import { haptics, setHapticsEnabled } from "@/src/lib/haptics";
+import { haptics } from "@/src/lib/haptics";
 import Constants from "expo-constants";
 
 type SectionKey = "cats" | "data" | "privacy" | null;
@@ -47,11 +46,6 @@ export default function SettingsScreen() {
   const [catName, setCatName] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-  const [hapticsOn, setHapticsOn] = useState(true);
-
-  useEffect(() => {
-    storage.getItem("derle.haptics", "1").then((v) => setHapticsOn(v !== "0"));
-  }, []);
 
   const toggle = (k: SectionKey) => {
     setOpen((cur) => (cur === k ? null : k));
@@ -171,28 +165,6 @@ export default function SettingsScreen() {
                 </Pressable>
               ))}
             </View>
-          </View>
-        </View>
-
-        {/* GENEL — Haptics compact */}
-        <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
-          {t("settings.general")}
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          <View style={styles.compactRow}>
-            <Text style={[styles.rowLabel, { color: colors.text }]}>
-              {t("settings.haptics")}
-            </Text>
-            <Switch
-              testID="haptics-toggle"
-              value={hapticsOn}
-              onValueChange={(v) => {
-                setHapticsOn(v);
-                setHapticsEnabled(v);
-                storage.setItem("derle.haptics", v ? "1" : "0");
-              }}
-              trackColor={{ true: colors.brand, false: colors.input }}
-            />
           </View>
         </View>
 
@@ -337,14 +309,6 @@ export default function SettingsScreen() {
         >
           <ActionRow icon="upload" label={t("settings.export")} onPress={onExport} colors={colors} testID="export-notes" />
           <ActionRow icon="download" label={t("settings.import")} onPress={onImport} colors={colors} testID="import-notes" />
-          <ActionRow
-            icon="trash-2"
-            label={confirmClear ? t("edit.deleteConfirm") : t("settings.clearLocal")}
-            onPress={onClear}
-            colors={colors}
-            danger
-            testID="clear-local"
-          />
         </CollapsibleCard>
 
         {/* PRIVACY */}

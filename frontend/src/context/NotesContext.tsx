@@ -160,7 +160,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         text: it.text,
         category: it.category,
         priority: it.priority,
-        pinned: it.priority !== "low",
+        pinned: false,   // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
         done: false,
         createdAt: now + idx,
         updatedAt: now + idx,
@@ -196,7 +196,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
             text: it.text,
             category: it.category,
             priority: it.priority,
-            pinned: it.priority !== "low",
+            pinned: false,   // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
             done: false,
             createdAt: now + idx,
             updatedAt: Date.now() + idx,

@@ -26,42 +26,60 @@ export default function OrganizeScreen() {
   const { openEdit } = useEditSheet();
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [doneOpen, setDoneOpen] = useState(false);
+  const [doneCollapsed, setDoneCollapsed] = useState<Record<string, boolean>>({});
 
   const orderedCatIds = useMemo(
     () => [...CATEGORY_ORDER, ...customCategories.map((c) => c.id)],
     [customCategories],
   );
 
-  // Group ALL notes (active + completed) by category. Completed notes stay
-  // inside their own category, just sorted to the bottom — never piled into a
-  // separate "completed" bucket. Notes are never auto-deleted.
+  // ── Active groups: non-done notes only ────────────────────────────────────
   const groups = useMemo(() => {
     return orderedCatIds
-      .map((id) => {
-        const items = notes
-          .filter((n) => n.category === id)
-          .sort((a, b) => {
-            if (a.done !== b.done) return a.done ? 1 : -1;
-            return (
-              priorityWeight(b) - priorityWeight(a) || b.updatedAt - a.updatedAt
-            );
-          });
-        return { id, items, activeCount: items.filter((n) => !n.done).length };
-      })
+      .map((id) => ({
+        id,
+        items: notes
+          .filter((n) => n.category === id && !n.done)
+          .sort(
+            (a, b) =>
+              priorityWeight(b) - priorityWeight(a) || b.updatedAt - a.updatedAt,
+          ),
+      }))
       .filter((g) => g.items.length > 0);
   }, [orderedCatIds, notes]);
+
+  // ── Done groups: completed notes separated into their own section ─────────
+  const doneGroups = useMemo(() => {
+    return orderedCatIds
+      .map((id) => ({
+        id,
+        items: notes
+          .filter((n) => n.category === id && n.done)
+          .sort((a, b) => b.updatedAt - a.updatedAt),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [orderedCatIds, notes]);
+
+  const totalDone = doneGroups.reduce((s, g) => s + g.items.length, 0);
+  const isEmpty = groups.length === 0 && doneGroups.length === 0;
 
   const catLabel = (id: string) =>
     CATEGORIES[id]
       ? t(`cat.${id}`)
       : customCategories.find((c) => c.id === id)?.label ?? t("cat.notlar");
 
-  const isEmpty = notes.length === 0;
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.bg, paddingTop: insets.top },
+      ]}
+    >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>{t("organize.title")}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {t("organize.title")}
+        </Text>
         <Pressable
           testID="open-settings"
           hitSlop={10}
@@ -74,7 +92,10 @@ export default function OrganizeScreen() {
 
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 28 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 28,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {isEmpty ? (
@@ -88,73 +109,225 @@ export default function OrganizeScreen() {
             </Text>
           </View>
         ) : (
-          groups.map((group) => {
-            const meta = resolveCategory(group.id, customCategories);
-            const isOpen = !collapsed[group.id];
-            return (
-              <View key={group.id} style={styles.section}>
+          <>
+            {/* ── Active category groups ─────────────────────────────────── */}
+            {groups.map((group) => {
+              const meta = resolveCategory(group.id, customCategories);
+              const isOpen = !collapsed[group.id];
+              return (
+                <View key={group.id} style={styles.section}>
+                  <Pressable
+                    testID={`cat-header-${group.id}`}
+                    style={styles.sectionHeader}
+                    onPress={() =>
+                      setCollapsed((c) => ({ ...c, [group.id]: !!isOpen }))
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.iconTile,
+                        { backgroundColor: meta.tint[scheme] },
+                      ]}
+                    >
+                      <Icon
+                        family={meta.icon.family}
+                        name={meta.icon.name}
+                        size={15}
+                        color={meta.fg[scheme]}
+                      />
+                    </View>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                      {catLabel(group.id)}
+                    </Text>
+                    <View
+                      style={[
+                        styles.countBadge,
+                        { backgroundColor: colors.input },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.countText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {group.items.length}
+                      </Text>
+                    </View>
+                    <Feather
+                      name={isOpen ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color={colors.textMuted}
+                    />
+                  </Pressable>
+                  {isOpen && (
+                    <View
+                      style={[
+                        styles.card,
+                        {
+                          backgroundColor: colors.card,
+                          borderColor: colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      {group.items.map((n, i) => (
+                        <NoteRow
+                          key={n.id}
+                          note={n}
+                          onEdit={openEdit}
+                          variant="organize"
+                          isLast={i === group.items.length - 1}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            {/* ── Tamamlananlar section ──────────────────────────────────── */}
+            {doneGroups.length > 0 && (
+              <View style={[styles.section, styles.doneSectionWrap]}>
+                {/* Divider */}
+                <View
+                  style={[
+                    styles.doneDivider,
+                    { backgroundColor: colors.divider },
+                  ]}
+                />
+
+                {/* Tamamlananlar collapsible header */}
                 <Pressable
-                  testID={`cat-header-${group.id}`}
+                  testID="tamamlananlar-header"
                   style={styles.sectionHeader}
-                  onPress={() =>
-                    setCollapsed((c) => ({ ...c, [group.id]: !!isOpen }))
-                  }
+                  onPress={() => setDoneOpen((v) => !v)}
                 >
-                  <View style={[styles.iconTile, { backgroundColor: meta.tint[scheme] }]}>
-                    <Icon
-                      family={meta.icon.family}
-                      name={meta.icon.name}
+                  <View
+                    style={[styles.iconTile, { backgroundColor: colors.input }]}
+                  >
+                    <Feather
+                      name="check-square"
                       size={15}
-                      color={meta.fg[scheme]}
+                      color={colors.textMuted}
                     />
                   </View>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    {catLabel(group.id)}
+                  <Text
+                    style={[styles.sectionTitle, { color: colors.textMuted }]}
+                  >
+                    {t("organize.completed")}
                   </Text>
-                  <View style={[styles.countBadge, { backgroundColor: colors.input }]}>
-                    <Text style={[styles.countText, { color: colors.textSecondary }]}>
-                      {group.activeCount}
+                  <View
+                    style={[
+                      styles.countBadge,
+                      { backgroundColor: colors.input },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.countText,
+                        { color: colors.textMuted },
+                      ]}
+                    >
+                      {totalDone}
                     </Text>
                   </View>
                   <Feather
-                    name={isOpen ? "chevron-up" : "chevron-down"}
+                    name={doneOpen ? "chevron-up" : "chevron-down"}
                     size={20}
                     color={colors.textMuted}
                   />
                 </Pressable>
-                {isOpen && (
-                  <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-                    {group.items.map((n, i, arr) => {
-                      // Insert a "Tamamlananlar" separator before the first done note
-                      const isFirstDone = n.done && (i === 0 || !arr[i - 1].done);
+
+                {/* Done sub-groups, each collapsible by category */}
+                {doneOpen && (
+                  <View style={{ gap: 12 }}>
+                    {doneGroups.map((group) => {
+                      const meta = resolveCategory(group.id, customCategories);
+                      const isOpen = !doneCollapsed[group.id];
                       return (
-                        <React.Fragment key={n.id}>
-                          {isFirstDone && (
+                        <View key={group.id}>
+                          <Pressable
+                            testID={`done-cat-${group.id}`}
+                            style={[styles.sectionHeader, styles.doneSubHeader]}
+                            onPress={() =>
+                              setDoneCollapsed((c) => ({
+                                ...c,
+                                [group.id]: !!isOpen,
+                              }))
+                            }
+                          >
                             <View
                               style={[
-                                styles.doneHeader,
-                                { borderTopColor: colors.divider, borderBottomColor: colors.divider },
+                                styles.iconTile,
+                                { backgroundColor: meta.tint[scheme], opacity: 0.6 },
                               ]}
                             >
-                              <Text style={[styles.doneLabel, { color: colors.textMuted }]}>
-                                {t("organize.completed")}
+                              <Icon
+                                family={meta.icon.family}
+                                name={meta.icon.name}
+                                size={14}
+                                color={meta.fg[scheme]}
+                              />
+                            </View>
+                            <Text
+                              style={[
+                                styles.doneSubTitle,
+                                { color: colors.textMuted },
+                              ]}
+                            >
+                              {catLabel(group.id)}
+                            </Text>
+                            <View
+                              style={[
+                                styles.countBadge,
+                                { backgroundColor: colors.input },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.countText,
+                                  { color: colors.textMuted },
+                                ]}
+                              >
+                                {group.items.length}
                               </Text>
                             </View>
+                            <Feather
+                              name={isOpen ? "chevron-up" : "chevron-down"}
+                              size={17}
+                              color={colors.textMuted}
+                            />
+                          </Pressable>
+                          {isOpen && (
+                            <View
+                              style={[
+                                styles.card,
+                                {
+                                  backgroundColor: colors.card,
+                                  borderColor: colors.cardBorder,
+                                  opacity: 0.8,
+                                },
+                              ]}
+                            >
+                              {group.items.map((n, i) => (
+                                <NoteRow
+                                  key={n.id}
+                                  note={n}
+                                  onEdit={openEdit}
+                                  variant="organize"
+                                  isLast={i === group.items.length - 1}
+                                />
+                              ))}
+                            </View>
                           )}
-                          <NoteRow
-                            note={n}
-                            onEdit={openEdit}
-                            variant="organize"
-                            isLast={i === arr.length - 1}
-                          />
-                        </React.Fragment>
+                        </View>
                       );
                     })}
                   </View>
                 )}
               </View>
-            );
-          })
+            )}
+          </>
         )}
       </KeyboardAwareScrollView>
     </View>
@@ -183,14 +356,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  section: {
-    marginBottom: 22,
+  section: { marginBottom: 22 },
+  doneSectionWrap: { marginTop: 4 },
+  doneDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginBottom: 18,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginBottom: 10,
+  },
+  doneSubHeader: {
+    marginBottom: 6,
   },
   iconTile: {
     width: 30,
@@ -202,6 +381,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 19,
     fontWeight: "700",
+    flexShrink: 1,
+    flex: 1,
+  },
+  doneSubTitle: {
+    fontSize: 16,
+    fontWeight: "600",
     flexShrink: 1,
     flex: 1,
   },
@@ -221,18 +406,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
-  },
-  doneHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  doneLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
   },
   empty: {
     alignItems: "center",
