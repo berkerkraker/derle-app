@@ -9,6 +9,7 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 
 import { useTheme } from "@/src/theme/ThemeContext";
+import { haptics } from "@/src/lib/haptics";
 
 interface Props {
   checked: boolean;
@@ -31,6 +32,7 @@ export function Checkbox({ checked, onToggle, testID }: Props) {
       withSpring(1.12, { duration: 100 }),
       withSpring(1, { duration: 120, damping: 14 }),
     );
+    haptics.light();
     onToggle();
   };
 

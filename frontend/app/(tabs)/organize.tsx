@@ -124,15 +124,32 @@ export default function OrganizeScreen() {
                 </Pressable>
                 {isOpen && (
                   <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-                    {group.items.map((n, i) => (
-                      <NoteRow
-                        key={n.id}
-                        note={n}
-                        onEdit={openEdit}
-                        variant="organize"
-                        isLast={i === group.items.length - 1}
-                      />
-                    ))}
+                    {group.items.map((n, i, arr) => {
+                      // Insert a "Tamamlananlar" separator before the first done note
+                      const isFirstDone = n.done && (i === 0 || !arr[i - 1].done);
+                      return (
+                        <React.Fragment key={n.id}>
+                          {isFirstDone && (
+                            <View
+                              style={[
+                                styles.doneHeader,
+                                { borderTopColor: colors.divider, borderBottomColor: colors.divider },
+                              ]}
+                            >
+                              <Text style={[styles.doneLabel, { color: colors.textMuted }]}>
+                                {t("organize.completed")}
+                              </Text>
+                            </View>
+                          )}
+                          <NoteRow
+                            note={n}
+                            onEdit={openEdit}
+                            variant="organize"
+                            isLast={i === arr.length - 1}
+                          />
+                        </React.Fragment>
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -204,6 +221,18 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
+  },
+  doneHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  doneLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   empty: {
     alignItems: "center",

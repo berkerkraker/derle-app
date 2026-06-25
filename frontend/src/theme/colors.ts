@@ -76,7 +76,7 @@ export const DARK: Palette = {
   sheet: "#1A1A1C",
   sheetHandle: "#3A3A3C",
   urgent: "#EF4444",
-  important: "#EAB308",
+  important: "#B45309",
   danger: "#F87171",
   dangerSoft: "#3B1414",
 };

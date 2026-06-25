@@ -93,7 +93,7 @@ export function NoteRow({ note, onEdit, variant, isLast }: Props) {
         >
           <Ionicons
             name={note.pinned ? "star" : "star-outline"}
-            size={19}
+            size={16}
             color={note.pinned ? colors.important : colors.textMuted}
           />
         </Pressable>
