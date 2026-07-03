@@ -105,7 +105,6 @@ const tr: Dict = {
 
   "settings.general": "GENEL",
   "settings.haptics": "Titreşim",
-  "settings.hapticsSub": "Dokunuşlarda hafif titreşimli geri bildirim",
 
   "common.cancel": "Vazgeç",
   "common.close": "Kapat",
@@ -215,7 +214,6 @@ const en: Dict = {
 
   "settings.general": "GENERAL",
   "settings.haptics": "Haptics",
-  "settings.hapticsSub": "Gentle vibration feedback on touch",
 
   "common.cancel": "Cancel",
   "common.close": "Close",

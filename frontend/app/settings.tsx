@@ -185,19 +185,13 @@ export default function SettingsScreen() {
               ))}
             </View>
           </View>
-        </View>
 
-        {/* HAPTICS — compact row */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder, marginTop: 14 }]}>
+          {/* Titreşim: önemli bir ayar değil — dil satırının altında sessiz bir satır */}
+          <View style={[styles.innerDivider, { backgroundColor: colors.divider }]} />
           <View style={styles.compactRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: colors.text }]}>
-                {t("settings.haptics")}
-              </Text>
-              <Text style={[styles.subText, { color: colors.textMuted, marginTop: 3 }]}>
-                {t("settings.hapticsSub")}
-              </Text>
-            </View>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>
+              {t("settings.haptics")}
+            </Text>
             <Switch
               testID="haptics-toggle"
               value={hapticsOn}
@@ -486,6 +480,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  innerDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 13,
   },
   rowLabel: {
     fontSize: 15,
