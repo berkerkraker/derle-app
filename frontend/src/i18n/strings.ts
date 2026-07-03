@@ -9,9 +9,9 @@ const tr: Dict = {
 
   "capture.title": "Aklında ne var?",
   "capture.placeholder": "Aklına ne geldiyse yaz…",
-  "capture.priority": "ÖNCELİKLİ",
-  "capture.emptyTitle": "Öncelik listesi temiz",
-  "capture.emptySub": "Yıldızladığın önemli notlar burada görünür.",
+  "capture.priority": "YILDIZLI",
+  "capture.emptyTitle": "Yıldızlı not yok",
+  "capture.emptySub": "Bir nota yıldız koy — en önemlilerin burada öncelik sırasına göre dizilir.",
   "capture.add": "Ekle",
   "capture.adding": "Düzenleniyor…",
   "capture.addedOne": "Eklendi · {cat}",
@@ -65,8 +65,8 @@ const tr: Dict = {
   "edit.title": "Notu düzenle",
   "edit.category": "Kategori",
   "edit.priority": "Öncelik",
-  "edit.makePriority": "Öncelikli yap",
-  "edit.removePriority": "Öncelikten çıkar",
+  "edit.star": "Yıldızla — Yakala ekranında öne çıkar",
+  "edit.starred": "Yıldızlı — Yakala ekranında görünüyor",
   "edit.save": "Kaydet",
   "edit.delete": "Sil",
   "edit.deleteConfirm": "Bu not silinsin mi?",
@@ -77,7 +77,8 @@ const tr: Dict = {
   "priority.medium": "Önemli",
   "priority.low": "Normal",
 
-  "ai.localUsed": "AI şu an kullanılamadı · not cihazında düzenlendi",
+  "ai.localUsed": "AI'a ulaşılamadı · öneri cihazında hazırlandı",
+  "note.done": "Tamamlandı ✓",
 
   "del.title": "Hesabı sil",
   "del.warn": "Hesabın ve buluttaki tüm notların kalıcı olarak silinir. Bu işlem geri alınamaz.",
@@ -104,9 +105,7 @@ const tr: Dict = {
 
   "settings.general": "GENEL",
   "settings.haptics": "Titreşim",
-  "settings.hapticsSub": "Dokunsal geri bildirim",
-  "settings.ai": "AI özellikleri",
-  "settings.aiSub": "✨ Derle: uzun metni notlara böler, kategorilere dağıtır",
+  "settings.hapticsSub": "Dokunuşlarda hafif titreşimli geri bildirim",
 
   "common.cancel": "Vazgeç",
   "common.close": "Kapat",
@@ -120,9 +119,9 @@ const en: Dict = {
 
   "capture.title": "What's on your mind?",
   "capture.placeholder": "Write whatever comes to mind…",
-  "capture.priority": "PRIORITY",
-  "capture.emptyTitle": "Priority list is clear",
-  "capture.emptySub": "Notes you star show up here.",
+  "capture.priority": "STARRED",
+  "capture.emptyTitle": "No starred notes",
+  "capture.emptySub": "Star a note — your most important ones line up here by priority.",
   "capture.add": "Add",
   "capture.adding": "Organizing…",
   "capture.addedOne": "Added · {cat}",
@@ -176,8 +175,8 @@ const en: Dict = {
   "edit.title": "Edit note",
   "edit.category": "Category",
   "edit.priority": "Priority",
-  "edit.makePriority": "Make priority",
-  "edit.removePriority": "Remove priority",
+  "edit.star": "Star — pin to the Capture screen",
+  "edit.starred": "Starred — shown on the Capture screen",
   "edit.save": "Save",
   "edit.delete": "Delete",
   "edit.deleteConfirm": "Delete this note?",
@@ -188,7 +187,8 @@ const en: Dict = {
   "priority.medium": "Important",
   "priority.low": "Normal",
 
-  "ai.localUsed": "AI unavailable · organized on your device",
+  "ai.localUsed": "AI unavailable · suggestion prepared on your device",
+  "note.done": "Done ✓",
 
   "del.title": "Delete account",
   "del.warn": "Your account and all notes in the cloud are permanently deleted. This cannot be undone.",
@@ -215,9 +215,7 @@ const en: Dict = {
 
   "settings.general": "GENERAL",
   "settings.haptics": "Haptics",
-  "settings.hapticsSub": "Touch feedback",
-  "settings.ai": "AI features",
-  "settings.aiSub": "✨ Derle: splits long text into notes and categorizes them",
+  "settings.hapticsSub": "Gentle vibration feedback on touch",
 
   "common.cancel": "Cancel",
   "common.close": "Close",

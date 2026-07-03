@@ -22,6 +22,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { Icon } from "@/src/components/Icon";
+import { SegmentedControl } from "@/src/components/SegmentedControl";
 import {
   CATEGORIES,
   CATEGORY_ORDER,
@@ -92,21 +93,19 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
     });
   }, [progress]);
 
+  // Öncelik ve yıldız bağımsızdır: yıldız "Yakala'da göster" demek,
+  // öncelik ise o listedeki sıralamayı belirler.
   const save = () => {
     if (note) {
       const cleaned = text.trim();
-      const nextPriority: Priority = pinned
-        ? priority === "low"
-          ? "medium"
-          : priority
-        : "low";
       updateNote(note.id, {
         text: cleaned.length > 0 ? cleaned : note.text,
         category,
-        priority: nextPriority,
+        priority,
         pinned,
       });
     }
+    haptics.success();
     close();
   };
 
@@ -119,13 +118,6 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
     haptics.warning();
     close();
   };
-
-  const onPriorityChange = (p: string) => {
-    const pr = p as Priority;
-    setPriority(pr);
-    setPinned(pr !== "low");
-  };
-  void onPriorityChange;
 
   const catIds = useMemo(
     () => [...CATEGORY_ORDER, ...customCategories.map((c) => c.id)],
@@ -229,9 +221,26 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
                 </ScrollView>
 
                 <Text style={[styles.label, { color: colors.textSecondary }]}>{t("edit.priority")}</Text>
+                <SegmentedControl
+                  testIDPrefix="edit-priority"
+                  value={priority}
+                  onChange={(p) => {
+                    haptics.selection();
+                    setPriority(p as Priority);
+                  }}
+                  options={[
+                    { label: t("priority.high"), value: "high" },
+                    { label: t("priority.medium"), value: "medium" },
+                    { label: t("priority.low"), value: "low" },
+                  ]}
+                />
+
                 <Pressable
-                  testID="edit-priority-toggle"
-                  onPress={() => setPinned((p) => !p)}
+                  testID="edit-star-toggle"
+                  onPress={() => {
+                    haptics.light();
+                    setPinned((p) => !p);
+                  }}
                   style={[
                     styles.starRow,
                     {
@@ -246,7 +255,7 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
                     color={pinned ? colors.important : colors.textSecondary}
                   />
                   <Text style={[styles.starLabel, { color: pinned ? colors.text : colors.textSecondary }]}>
-                    {t("edit.makePriority")}
+                    {pinned ? t("edit.starred") : t("edit.star")}
                   </Text>
                 </Pressable>
 
@@ -352,6 +361,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1.5,
+    marginTop: 10,
   },
   starLabel: { fontSize: 15.5, fontWeight: "600" },
   actions: {

@@ -11,6 +11,7 @@ import { OrganizedItem } from "@/src/types";
 interface Props {
   visible: boolean;
   items: OrganizedItem[];
+  source?: "ai" | "local";
   onConfirm: () => void;
   onSingle: () => void;
   onCancel: () => void;
@@ -18,7 +19,7 @@ interface Props {
 
 // "✨ Derle" önizlemesi: AI'nın önerdiği bölme kaydedilmeden ÖNCE gösterilir.
 // Kullanıcı onaylamadan hiçbir not oluşmaz — kontrol her zaman kullanıcıda.
-export function DerlePreview({ visible, items, onConfirm, onSingle, onCancel }: Props) {
+export function DerlePreview({ visible, items, source, onConfirm, onSingle, onCancel }: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
@@ -49,6 +50,15 @@ export function DerlePreview({ visible, items, onConfirm, onSingle, onCancel }: 
           <Text style={[styles.sub, { color: colors.textMuted }]}>
             {t("preview.sub", { n: items.length })}
           </Text>
+
+          {source === "local" && (
+            <View style={[styles.localNote, { backgroundColor: colors.input }]}>
+              <Feather name="wifi-off" size={13} color={colors.textMuted} />
+              <Text style={[styles.localNoteText, { color: colors.textMuted }]}>
+                {t("ai.localUsed")}
+              </Text>
+            </View>
+          )}
 
           <ScrollView
             style={styles.list}
@@ -135,6 +145,20 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     marginTop: 3,
     marginBottom: 12,
+  },
+  localNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  localNoteText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    flexShrink: 1,
   },
   list: {
     flexGrow: 0,

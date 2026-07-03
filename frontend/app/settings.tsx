@@ -20,11 +20,13 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 import { useNotes } from "@/src/context/NotesContext";
 import { useAuth } from "@/src/context/AuthContext";
-import { usePrefs } from "@/src/context/PrefsContext";
 import { useToast } from "@/src/components/Toast";
 import { storage } from "@/src/utils/storage";
-import { haptics } from "@/src/lib/haptics";
+import { haptics, setHapticsEnabled } from "@/src/lib/haptics";
+import { CUSTOM_COLOR_CHOICES } from "@/src/constants/categories";
 import Constants from "expo-constants";
+
+const HAPTICS_KEY = "derle.haptics";
 
 type SectionKey = "cats" | "data" | "privacy" | null;
 
@@ -34,7 +36,6 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signInWithGoogle, signOut } = useAuth();
-  const { aiEnabled, setAiEnabled } = usePrefs();
   const {
     customCategories,
     addCustomCategory,
@@ -47,8 +48,21 @@ export default function SettingsScreen() {
 
   const [open, setOpen] = useState<SectionKey>(null);
   const [catName, setCatName] = useState("");
+  const [catColor, setCatColor] = useState(CUSTOM_COLOR_CHOICES[0]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [hapticsOn, setHapticsOn] = useState(true);
+
+  useEffect(() => {
+    storage.getItem<string>(HAPTICS_KEY, "1").then((v) => setHapticsOn(v !== "0"));
+  }, []);
+
+  const onToggleHaptics = (v: boolean) => {
+    setHapticsOn(v);
+    setHapticsEnabled(v);
+    storage.setItem(HAPTICS_KEY, v ? "1" : "0");
+    if (v) haptics.light();
+  };
 
   const toggle = (k: SectionKey) => {
     setOpen((cur) => (cur === k ? null : k));
@@ -96,8 +110,10 @@ export default function SettingsScreen() {
 
   const onAddCat = () => {
     if (!catName.trim()) return;
-    addCustomCategory(catName.trim(), "#64748B");
+    addCustomCategory(catName.trim(), catColor);
     setCatName("");
+    setCatColor(CUSTOM_COLOR_CHOICES[0]);
+    haptics.success();
   };
 
   return (
@@ -171,24 +187,21 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* AI FEATURES — compact row; off = Derle button hidden, app fully classic */}
+        {/* HAPTICS — compact row */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder, marginTop: 14 }]}>
           <View style={styles.compactRow}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: colors.text }]}>
-                {t("settings.ai")}
+                {t("settings.haptics")}
               </Text>
               <Text style={[styles.subText, { color: colors.textMuted, marginTop: 3 }]}>
-                {t("settings.aiSub")}
+                {t("settings.hapticsSub")}
               </Text>
             </View>
             <Switch
-              testID="ai-toggle"
-              value={aiEnabled}
-              onValueChange={(v) => {
-                haptics.light();
-                setAiEnabled(v);
-              }}
+              testID="haptics-toggle"
+              value={hapticsOn}
+              onValueChange={onToggleHaptics}
               trackColor={{ false: colors.input, true: colors.brand }}
               thumbColor="#FFFFFF"
             />
@@ -311,6 +324,25 @@ export default function SettingsScreen() {
               placeholderTextColor={colors.textMuted}
               style={[styles.catInput, { backgroundColor: colors.input, color: colors.inputText }]}
             />
+            <View style={styles.colorRow}>
+              {CUSTOM_COLOR_CHOICES.map((c) => (
+                <Pressable
+                  key={c}
+                  testID={`cat-color-${c}`}
+                  onPress={() => {
+                    haptics.selection();
+                    setCatColor(c);
+                  }}
+                  style={[
+                    styles.colorDot,
+                    {
+                      backgroundColor: c,
+                      borderColor: catColor === c ? colors.text : "transparent",
+                    },
+                  ]}
+                />
+              ))}
+            </View>
             <Pressable
               testID="add-cat-button"
               onPress={onAddCat}

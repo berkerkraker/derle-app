@@ -50,11 +50,7 @@ export function Checkbox({ checked, onToggle, testID }: Props) {
         ]}
       >
         {checked ? (
-          <Feather
-            name="check"
-            size={14}
-            color={colors.scheme === "light" ? "#FFFFFF" : "#052E16"}
-          />
+          <Feather name="check" size={14} color={colors.brandText} />
         ) : null}
       </Pressable>
     </Animated.View>

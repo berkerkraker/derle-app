@@ -15,7 +15,6 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { I18nProvider } from "@/src/i18n/I18nContext";
 import { AuthProvider } from "@/src/context/AuthContext";
-import { PrefsProvider } from "@/src/context/PrefsContext";
 import { NotesProvider } from "@/src/context/NotesContext";
 import { ToastProvider } from "@/src/components/Toast";
 
@@ -67,16 +66,14 @@ export default function RootLayout() {
           <ThemeProvider>
             <I18nProvider>
               <AuthProvider>
-                <PrefsProvider>
-                  <NotesProvider>
-                    <ToastProvider>
-                      <EditSheetProvider>
-                        <ThemedNavigator />
-                        <WelcomeOverlay />
-                      </EditSheetProvider>
-                    </ToastProvider>
-                  </NotesProvider>
-                </PrefsProvider>
+                <NotesProvider>
+                  <ToastProvider>
+                    <EditSheetProvider>
+                      <ThemedNavigator />
+                      <WelcomeOverlay />
+                    </EditSheetProvider>
+                  </ToastProvider>
+                </NotesProvider>
               </AuthProvider>
             </I18nProvider>
           </ThemeProvider>

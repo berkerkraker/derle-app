@@ -4,6 +4,11 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { Icon } from "@/src/components/Icon";
 import { NoteRow } from "@/src/components/NoteRow";
@@ -171,13 +176,19 @@ export default function OrganizeScreen() {
                       ]}
                     >
                       {group.items.map((n, i) => (
-                        <NoteRow
+                        <Animated.View
                           key={n.id}
-                          note={n}
-                          onEdit={openEdit}
-                          variant="organize"
-                          isLast={i === group.items.length - 1}
-                        />
+                          layout={LinearTransition.springify().damping(18)}
+                          entering={FadeIn.duration(180)}
+                          exiting={FadeOut.duration(160)}
+                        >
+                          <NoteRow
+                            note={n}
+                            onEdit={openEdit}
+                            variant="organize"
+                            isLast={i === group.items.length - 1}
+                          />
+                        </Animated.View>
                       ))}
                     </View>
                   )}
@@ -310,13 +321,19 @@ export default function OrganizeScreen() {
                               ]}
                             >
                               {group.items.map((n, i) => (
-                                <NoteRow
+                                <Animated.View
                                   key={n.id}
-                                  note={n}
-                                  onEdit={openEdit}
-                                  variant="organize"
-                                  isLast={i === group.items.length - 1}
-                                />
+                                  layout={LinearTransition.springify().damping(18)}
+                                  entering={FadeIn.duration(180)}
+                                  exiting={FadeOut.duration(160)}
+                                >
+                                  <NoteRow
+                                    note={n}
+                                    onEdit={openEdit}
+                                    variant="organize"
+                                    isLast={i === group.items.length - 1}
+                                  />
+                                </Animated.View>
                               ))}
                             </View>
                           )}
