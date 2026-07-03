@@ -30,7 +30,7 @@ export function Checkbox({ checked, onToggle, testID }: Props) {
     scale.value = withSequence(
       withSpring(0.78, { duration: 80 }),
       withSpring(1.12, { duration: 100 }),
-      withSpring(1, { duration: 120, damping: 14 }),
+      withSpring(1, { duration: 120, dampingRatio: 1 }),
     );
     haptics.light();
     onToggle();

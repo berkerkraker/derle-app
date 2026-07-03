@@ -5,6 +5,7 @@ import {
   Pressable,
   TextInput,
   StyleSheet,
+  Switch,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +20,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 import { useNotes } from "@/src/context/NotesContext";
 import { useAuth } from "@/src/context/AuthContext";
+import { usePrefs } from "@/src/context/PrefsContext";
 import { useToast } from "@/src/components/Toast";
 import { storage } from "@/src/utils/storage";
 import { haptics } from "@/src/lib/haptics";
@@ -32,6 +34,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signInWithGoogle, signOut } = useAuth();
+  const { aiEnabled, setAiEnabled } = usePrefs();
   const {
     customCategories,
     addCustomCategory,
@@ -165,6 +168,30 @@ export default function SettingsScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+        </View>
+
+        {/* AI FEATURES — compact row; off = Derle button hidden, app fully classic */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder, marginTop: 14 }]}>
+          <View style={styles.compactRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.text }]}>
+                {t("settings.ai")}
+              </Text>
+              <Text style={[styles.subText, { color: colors.textMuted, marginTop: 3 }]}>
+                {t("settings.aiSub")}
+              </Text>
+            </View>
+            <Switch
+              testID="ai-toggle"
+              value={aiEnabled}
+              onValueChange={(v) => {
+                haptics.light();
+                setAiEnabled(v);
+              }}
+              trackColor={{ false: colors.input, true: colors.brand }}
+              thumbColor="#FFFFFF"
+            />
           </View>
         </View>
 

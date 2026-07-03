@@ -12,7 +12,8 @@ import { AppState } from "react-native";
 import { storage } from "@/src/utils/storage";
 import { api } from "@/src/lib/api";
 import { organizeLocally } from "@/src/lib/localOrganize";
-import { Note, CustomCategory, Priority } from "@/src/types";
+import { CATEGORIES } from "@/src/constants/categories";
+import { Note, CustomCategory, Priority, OrganizedItem } from "@/src/types";
 import { useAuth } from "@/src/context/AuthContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 
@@ -26,7 +27,11 @@ function uid(): string {
 export interface AddResult {
   count: number;
   categories: string[];
-  usedAI: boolean;
+}
+
+export interface OrganizePreview {
+  source: "ai" | "local";
+  items: OrganizedItem[];
 }
 
 interface NotesContextValue {
@@ -35,7 +40,9 @@ interface NotesContextValue {
   processing: boolean;
   syncing: boolean;
   customCategories: CustomCategory[];
-  addFromText: (text: string) => Promise<AddResult>;
+  addManual: (text: string, categoryId?: string) => AddResult;
+  previewOrganize: (text: string) => Promise<OrganizePreview>;
+  addOrganized: (items: OrganizedItem[]) => AddResult;
   updateNote: (id: string, patch: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   toggleDone: (id: string) => void;
@@ -143,76 +150,98 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
     storage.setItem(CUSTOM_KEY, JSON.stringify(next));
   }, []);
 
-  const addFromText = useCallback(
-    async (text: string): Promise<AddResult> => {
+  // Not ekleme = anında ve öngörülebilir: kullanıcının seçtiği kategoriye tek
+  // not olarak kaydedilir. AI hiçbir zaman kendiliğinden bölmez/taşımaz.
+  const addManual = useCallback(
+    (text: string, categoryId?: string): AddResult => {
       const clean = (text || "").trim();
-      if (!clean) return { count: 0, categories: [], usedAI: false };
+      if (!clean) return { count: 0, categories: [] };
 
-      // ── 1. Instant local save — never blocks the UI ──────────────────────
-      let localItems = organizeLocally(clean, lang);
-      if (!localItems || localItems.length === 0) {
-        localItems = [{ text: clean, category: "notlar", priority: "low" as Priority }];
+      const category = categoryId || "notlar";
+      const now = Date.now();
+      const note: Note = {
+        id: uid(),
+        text: clean,
+        category,
+        priority: "low",
+        pinned: false, // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
+        done: false,
+        createdAt: now,
+        updatedAt: now,
+        deleted: false,
+        source: "local",
+      };
+
+      persist([note, ...allRef.current]);
+      scheduleSync();
+      return { count: 1, categories: [category] };
+    },
+    [persist, scheduleSync],
+  );
+
+  // "✨ Derle" butonu: AI'dan bölme ÖNERİSİ alır, hiçbir şey kaydetmez.
+  // Kullanıcı önizlemeyi onaylamadan not oluşmaz. AI yoksa cihazdaki kurallı
+  // motor öneri üretir — buton asla ölü kalmaz, metin asla kaybolmaz.
+  const previewOrganize = useCallback(
+    async (text: string): Promise<OrganizePreview> => {
+      const clean = (text || "").trim();
+      if (!clean) return { source: "local", items: [] };
+
+      setProcessing(true);
+      try {
+        const res = await api.organize(clean, lang);
+        if (res.source === "ai" && res.items?.length) {
+          return { source: "ai", items: res.items };
+        }
+      } catch {
+        /* fall through to local */
+      } finally {
+        setProcessing(false);
       }
 
+      let local = organizeLocally(clean, lang);
+      if (!local || local.length === 0) {
+        local = [{ text: clean, category: "notlar", priority: "low" as Priority }];
+      }
+      return { source: "local", items: local };
+    },
+    [lang],
+  );
+
+  // Önizleme onaylanınca çağrılır: önerilen parçaları toplu kaydeder.
+  const addOrganized = useCallback(
+    (items: OrganizedItem[]): AddResult => {
+      const valid = (items || []).filter(
+        (it) => it && typeof it.text === "string" && it.text.trim().length > 0,
+      );
+      if (valid.length === 0) return { count: 0, categories: [] };
+
+      const known = new Set([
+        ...Object.keys(CATEGORIES),
+        ...customCategories.map((c) => c.id),
+      ]);
       const now = Date.now();
-      const created: Note[] = localItems.map((it, idx) => ({
+      const created: Note[] = valid.map((it, idx) => ({
         id: uid(),
-        text: it.text,
-        category: it.category,
-        priority: it.priority,
-        pinned: false,   // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
+        text: it.text.trim(),
+        category: known.has(it.category) ? it.category : "notlar",
+        priority: (it.priority as Priority) || "low",
+        pinned: false, // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
         done: false,
         createdAt: now + idx,
         updatedAt: now + idx,
         deleted: false,
-        source: "local",
+        source: "ai",
       }));
 
       persist([...created, ...allRef.current]);
       scheduleSync();
-
-      const createdIds = created.map((n) => n.id);
-      const cats = Array.from(new Set(created.map((n) => n.category)));
-
-      // ── 2. Background AI upgrade — fire-and-forget, never blocks ─────────
-      setProcessing(true);
-      api
-        .organize(clean, lang)
-        .then((res) => {
-          setProcessing(false);
-          if (res.source !== "ai" || !res.items?.length) return;
-
-          // Only replace notes the user hasn't touched yet
-          const current = allRef.current;
-          const allUntouched = createdIds.every((id) =>
-            current.some(
-              (n) => n.id === id && !n.done && !n.deleted && n.source === "local",
-            ),
-          );
-          if (!allUntouched) return;
-
-          const aiNotes: Note[] = (res.items as any[]).map((it, idx) => ({
-            id: uid(),
-            text: it.text,
-            category: it.category,
-            priority: it.priority,
-            pinned: false,   // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
-            done: false,
-            createdAt: now + idx,
-            updatedAt: Date.now() + idx,
-            deleted: false,
-            source: "ai",
-          }));
-
-          const without = current.filter((n) => !createdIds.includes(n.id));
-          persist([...aiNotes, ...without]);
-          scheduleSync();
-        })
-        .catch(() => setProcessing(false));
-
-      return { count: created.length, categories: cats, usedAI: false };
+      return {
+        count: created.length,
+        categories: Array.from(new Set(created.map((n) => n.category))),
+      };
     },
-    [lang, persist, scheduleSync],
+    [customCategories, persist, scheduleSync],
   );
 
   const updateNote = useCallback(
@@ -343,7 +372,9 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
       processing,
       syncing,
       customCategories,
-      addFromText,
+      addManual,
+      previewOrganize,
+      addOrganized,
       updateNote,
       deleteNote,
       toggleDone,
@@ -360,7 +391,9 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
       processing,
       syncing,
       customCategories,
-      addFromText,
+      addManual,
+      previewOrganize,
+      addOrganized,
       updateNote,
       deleteNote,
       toggleDone,

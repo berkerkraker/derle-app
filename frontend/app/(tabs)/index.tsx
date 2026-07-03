@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   Pressable,
   StyleSheet,
+  ScrollView,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,10 +18,12 @@ import {
 
 import { Icon } from "@/src/components/Icon";
 import { NoteRow } from "@/src/components/NoteRow";
+import { DerlePreview } from "@/src/components/DerlePreview";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 import { useNotes, selectPriorityNotes } from "@/src/context/NotesContext";
 import { useAuth } from "@/src/context/AuthContext";
+import { usePrefs } from "@/src/context/PrefsContext";
 import { useToast } from "@/src/components/Toast";
 import { useEditSheet } from "@/src/context/EditSheetContext";
 import {
@@ -30,19 +33,70 @@ import {
 } from "@/src/constants/categories";
 import { headerDate } from "@/src/lib/format";
 import { haptics } from "@/src/lib/haptics";
+import { storage } from "@/src/utils/storage";
+import { OrganizedItem } from "@/src/types";
+
+const RECENT_KEY = "derle.recentCats";
 
 export default function CaptureScreen() {
   const { colors, scheme } = useTheme();
   const { t, lang } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { notes, processing, addFromText, customCategories } = useNotes();
-  const { token, syncing } = useAuth();
+  const {
+    notes,
+    processing,
+    syncing,
+    addManual,
+    previewOrganize,
+    addOrganized,
+    customCategories,
+  } = useNotes();
+  const { token } = useAuth();
+  const { aiEnabled } = usePrefs();
   const { show } = useToast();
   const { openEdit } = useEditSheet();
 
   const [text, setText] = useState("");
   const [collapsedPriority, setCollapsedPriority] = useState<Record<string, boolean>>({});
+  const [selectedCat, setSelectedCat] = useState<string | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [preview, setPreview] = useState<OrganizedItem[] | null>(null);
+
+  useEffect(() => {
+    storage.getItem(RECENT_KEY, "").then((raw) => {
+      try {
+        const parsed = JSON.parse(raw as string);
+        if (Array.isArray(parsed)) {
+          setRecent(parsed.filter((x) => typeof x === "string"));
+        }
+      } catch {
+        /* ignore */
+      }
+    });
+  }, []);
+
+  const bumpRecent = (id: string) => {
+    setRecent((prev) => {
+      const next = [id, ...prev.filter((x) => x !== id)].slice(0, 8);
+      storage.setItem(RECENT_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Chip order: last-used categories first, then the canonical order.
+  const chipOrder = useMemo(() => {
+    const base = [...CATEGORY_ORDER, ...customCategories.map((c) => c.id)];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const id of [...recent, ...base]) {
+      if (base.includes(id) && !seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    }
+    return out;
+  }, [recent, customCategories]);
 
   const priorityNotes = useMemo(() => selectPriorityNotes(notes), [notes]);
 
@@ -62,7 +116,7 @@ export default function CaptureScreen() {
       .map((id) => ({ id, items: map[id] }));
   }, [priorityNotes, customCategories]);
 
-  // Button enabled as soon as there is text — never blocked by AI processing
+  // Button enabled as soon as there is text — adding is always instant
   const canAdd = text.trim().length > 0;
 
   const catLabel = (id: string) =>
@@ -70,17 +124,44 @@ export default function CaptureScreen() {
       ? t(`cat.${id}`)
       : customCategories.find((c) => c.id === id)?.label ?? t("cat.notlar");
 
-  const onAdd = async () => {
+  const onAdd = () => {
     const value = text.trim();
     if (!value) return;
     setText("");
     haptics.light();
-    const res = await addFromText(value);
+    const res = addManual(value, selectedCat ?? undefined);
     if (res.count > 0) {
-      if (res.count === 1)
-        show(t("capture.addedOne", { cat: catLabel(res.categories[0]) }));
-      else show(t("capture.addedMany", { n: res.count }));
+      show(t("capture.addedOne", { cat: catLabel(res.categories[0]) }));
+      if (selectedCat) bumpRecent(selectedCat);
     }
+  };
+
+  const onDerle = async () => {
+    const value = text.trim();
+    if (!value || processing) return;
+    haptics.light();
+    const res = await previewOrganize(value);
+    if (!res.items.length) {
+      show(t("capture.derleFail"));
+      return;
+    }
+    setPreview(res.items);
+  };
+
+  const onPreviewConfirm = () => {
+    if (!preview) return;
+    const res = addOrganized(preview);
+    setPreview(null);
+    setText("");
+    haptics.success();
+    if (res.count === 1)
+      show(t("capture.addedOne", { cat: catLabel(res.categories[0]) }));
+    else show(t("capture.addedMany", { n: res.count }));
+  };
+
+  const onPreviewSingle = () => {
+    setPreview(null);
+    onAdd();
   };
 
   const toggleGroup = (id: string) =>
@@ -148,16 +229,56 @@ export default function CaptureScreen() {
           ]}
         />
 
-        {/* section header with background AI indicator */}
+        {/* category chips — user picks where the note goes; none = Notlar */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          style={styles.chipRow}
+          contentContainerStyle={styles.chipRowContent}
+        >
+          {chipOrder.map((id) => {
+            const meta = resolveCategory(id, customCategories);
+            const sel = selectedCat === id;
+            return (
+              <Pressable
+                key={id}
+                testID={`capture-cat-${id}`}
+                onPress={() => {
+                  haptics.light();
+                  setSelectedCat(sel ? null : id);
+                }}
+                style={[
+                  styles.catChip,
+                  {
+                    backgroundColor: sel ? meta.tint[scheme] : colors.card,
+                    borderColor: sel ? meta.fg[scheme] : colors.cardBorder,
+                  },
+                ]}
+              >
+                <Icon
+                  family={meta.icon.family}
+                  name={meta.icon.name}
+                  size={13}
+                  color={sel ? meta.fg[scheme] : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.catChipText,
+                    { color: sel ? meta.fg[scheme] : colors.textSecondary },
+                  ]}
+                >
+                  {catLabel(id)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         <View style={styles.sectionRow}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
             {t("capture.priority")}
           </Text>
-          {processing && (
-            <View style={styles.aiDot} testID="ai-processing-indicator">
-              <ActivityIndicator size="small" color={colors.brand} />
-            </View>
-          )}
         </View>
 
         {priorityGroups.length === 0 ? (
@@ -265,31 +386,77 @@ export default function CaptureScreen() {
             },
           ]}
         >
-          <Pressable
-            testID="add-note-button"
-            onPress={onAdd}
-            disabled={!canAdd}
-            style={[
-              styles.addBtn,
-              { backgroundColor: canAdd ? colors.brand : colors.input },
-            ]}
-          >
-            <Feather
-              name="plus"
-              size={20}
-              color={canAdd ? colors.brandText : colors.textMuted}
-            />
-            <Text
+          <View style={styles.btnRow}>
+            {aiEnabled && (
+              <Pressable
+                testID="derle-button"
+                onPress={onDerle}
+                disabled={!canAdd || processing}
+                style={[
+                  styles.derleBtn,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: canAdd ? colors.brand : colors.cardBorder,
+                  },
+                ]}
+              >
+                {processing ? (
+                  <ActivityIndicator size="small" color={colors.brand} />
+                ) : (
+                  <>
+                    <Icon
+                      family="ionicons"
+                      name="sparkles-outline"
+                      size={16}
+                      color={canAdd ? colors.brand : colors.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.derleText,
+                        { color: canAdd ? colors.brand : colors.textMuted },
+                      ]}
+                    >
+                      {t("capture.derle")}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            )}
+            <Pressable
+              testID="add-note-button"
+              onPress={onAdd}
+              disabled={!canAdd}
               style={[
-                styles.addText,
-                { color: canAdd ? colors.brandText : colors.textMuted },
+                styles.addBtn,
+                { backgroundColor: canAdd ? colors.brand : colors.input },
               ]}
             >
-              {t("capture.add")}
-            </Text>
-          </Pressable>
+              <Feather
+                name="plus"
+                size={20}
+                color={canAdd ? colors.brandText : colors.textMuted}
+              />
+              <Text
+                style={[
+                  styles.addText,
+                  { color: canAdd ? colors.brandText : colors.textMuted },
+                ]}
+              >
+                {t("capture.add")}
+                {selectedCat ? ` · ${catLabel(selectedCat)}` : ""}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardStickyView>
+
+      <DerlePreview
+        visible={preview !== null}
+        items={preview ?? []}
+        onConfirm={onPreviewConfirm}
+        onSingle={onPreviewSingle}
+        onCancel={() => setPreview(null)}
+      />
     </View>
   );
 }
@@ -340,6 +507,27 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     textAlignVertical: "top",
   },
+  chipRow: {
+    marginTop: 12,
+    flexGrow: 0,
+  },
+  chipRowContent: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  catChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 13,
+    height: 36,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  catChipText: {
+    fontSize: 13.5,
+    fontWeight: "600",
+  },
   sectionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -351,12 +539,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.2,
-  },
-  aiDot: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
   },
   groups: { gap: 12 },
   group: {},
@@ -416,7 +598,27 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  btnRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  derleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    paddingHorizontal: 18,
+    minWidth: 108,
+  },
+  derleText: {
+    fontSize: 15.5,
+    fontWeight: "700",
+  },
   addBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

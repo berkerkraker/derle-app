@@ -33,7 +33,7 @@ export function WelcomeOverlay() {
 
   useEffect(() => {
     (async () => {
-      const v = await storage.getItem(ONBOARDED_KEY, "");
+      const v = await storage.getItem<string>(ONBOARDED_KEY, "");
       setOnboarded(v === "1");
       setChecked(true);
     })();

@@ -15,6 +15,7 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { I18nProvider } from "@/src/i18n/I18nContext";
 import { AuthProvider } from "@/src/context/AuthContext";
+import { PrefsProvider } from "@/src/context/PrefsContext";
 import { NotesProvider } from "@/src/context/NotesContext";
 import { ToastProvider } from "@/src/components/Toast";
 
@@ -48,7 +49,7 @@ export default function RootLayout() {
   const [loaded, error] = useIconFonts();
 
   useEffect(() => {
-    storage.getItem("derle.haptics", "1").then((v) => setHapticsEnabled(v !== "0"));
+    storage.getItem<string>("derle.haptics", "1").then((v) => setHapticsEnabled(v !== "0"));
   }, []);
 
   useEffect(() => {
@@ -66,14 +67,16 @@ export default function RootLayout() {
           <ThemeProvider>
             <I18nProvider>
               <AuthProvider>
-                <NotesProvider>
-                  <ToastProvider>
-                    <EditSheetProvider>
-                      <ThemedNavigator />
-                      <WelcomeOverlay />
-                    </EditSheetProvider>
-                  </ToastProvider>
-                </NotesProvider>
+                <PrefsProvider>
+                  <NotesProvider>
+                    <ToastProvider>
+                      <EditSheetProvider>
+                        <ThemedNavigator />
+                        <WelcomeOverlay />
+                      </EditSheetProvider>
+                    </ToastProvider>
+                  </NotesProvider>
+                </PrefsProvider>
               </AuthProvider>
             </I18nProvider>
           </ThemeProvider>
