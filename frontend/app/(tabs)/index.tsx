@@ -285,17 +285,43 @@ export default function CaptureScreen() {
         </View>
 
         {focusList.length === 0 ? (
-          <View style={styles.empty} testID="capture-empty">
-            <Feather name="check-circle" size={22} color={colors.textMuted} />
-            <Text
-              style={[styles.emptyTitle, { color: colors.textSecondary }]}
-            >
-              {t("capture.emptyTitle")}
-            </Text>
-            <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              {t("capture.emptySub")}
-            </Text>
-          </View>
+          notes.length === 0 ? (
+            // İlk açılış: tek dokunuşla sihri gösteren örnek akışı
+            <View style={styles.empty} testID="capture-demo">
+              <Icon family="ionicons" name="sparkles-outline" size={22} color={colors.brand} />
+              <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
+                {t("capture.demoTitle")}
+              </Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                {t("capture.demoSub")}
+              </Text>
+              <Pressable
+                testID="demo-fill"
+                onPress={() => {
+                  haptics.light();
+                  setText(t("capture.demoSample"));
+                  inputRef.current?.focus();
+                }}
+                style={[styles.demoBtn, { borderColor: colors.brand }]}
+              >
+                <Text style={[styles.demoBtnText, { color: colors.brand }]}>
+                  {t("capture.demoBtn")}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.empty} testID="capture-empty">
+              <Feather name="check-circle" size={22} color={colors.textMuted} />
+              <Text
+                style={[styles.emptyTitle, { color: colors.textSecondary }]}
+              >
+                {t("capture.emptyTitle")}
+              </Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                {t("capture.emptySub")}
+              </Text>
+            </View>
+          )
         ) : (
           <View
             style={[
@@ -309,9 +335,9 @@ export default function CaptureScreen() {
             {focusList.map((n, i) => (
               <Animated.View
                 key={n.id}
-                layout={LinearTransition.springify().damping(18)}
-                entering={FadeIn.duration(180)}
-                exiting={FadeOut.duration(160)}
+                layout={LinearTransition.duration(200)}
+                entering={FadeIn.duration(150)}
+                exiting={FadeOut.duration(120)}
               >
                 <NoteRow
                   note={n}
@@ -502,6 +528,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 24,
     lineHeight: 19,
+  },
+  demoBtn: {
+    marginTop: 10,
+    height: 40,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  demoBtnText: {
+    fontSize: 14.5,
+    fontWeight: "700",
   },
   addBar: {
     paddingHorizontal: 20,

@@ -72,9 +72,9 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
       Animated.spring(progress, {
         toValue: 1,
         useNativeDriver: true,
-        damping: 22,
-        stiffness: 240,
-        mass: 0.7,
+        damping: 30,
+        stiffness: 320,
+        mass: 0.6,
       }).start();
     }
   }, [mounted, progress]);

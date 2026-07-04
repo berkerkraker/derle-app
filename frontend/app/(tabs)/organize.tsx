@@ -252,9 +252,9 @@ export default function OrganizeScreen() {
                       {group.items.map((n, i) => (
                         <Animated.View
                           key={n.id}
-                          layout={LinearTransition.springify().damping(18)}
-                          entering={FadeIn.duration(180)}
-                          exiting={FadeOut.duration(160)}
+                          layout={LinearTransition.duration(200)}
+                          entering={FadeIn.duration(150)}
+                          exiting={FadeOut.duration(120)}
                         >
                           <NoteRow
                             note={n}
@@ -397,9 +397,9 @@ export default function OrganizeScreen() {
                               {group.items.map((n, i) => (
                                 <Animated.View
                                   key={n.id}
-                                  layout={LinearTransition.springify().damping(18)}
-                                  entering={FadeIn.duration(180)}
-                                  exiting={FadeOut.duration(160)}
+                                  layout={LinearTransition.duration(200)}
+                                  entering={FadeIn.duration(150)}
+                                  exiting={FadeOut.duration(120)}
                                 >
                                   <NoteRow
                                     note={n}

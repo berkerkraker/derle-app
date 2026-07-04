@@ -1,45 +1,98 @@
 import { Note, OrganizedItem, Priority, Lang } from "@/src/types";
 
-// Derle motoru — tamamen cihazda çalışan kurallı sınıflandırıcı.
+// Derle Zekâsı — tamamen cihazda çalışan sınıflandırıcı.
 // Kullanıcının kelimelerini ASLA değiştirmez: yalnızca açıkça ayrı satırları
 // böler, kategori ve öncelik etiketi önerir. Hiçbir metin cihazdan çıkmaz.
 // En kötü ihtimalle metnin tamamını tek "notlar" notu olarak döndürür.
+//
+// Eşleştirme üç seviyede çalışır (yanlış pozitifleri azaltmak için):
+//   phrases — çok kelimeli kalıplar, alt-dizi olarak aranır ("son tarih")
+//   stems   — ≥4 harfli kökler, kelime başından eşleşir (doktor → doktora)
+//   exact   — kısa/riskli kelimeler, yalnızca tam kelime ("al", "ara", "su")
 
-const KEYWORDS: Record<string, string[]> = {
-  saglik: [
-    "ilaç", "ilac", "doktor", "hastane", "sağlık", "saglik", "takviye", "vitamin",
-    "diş", "dis", "randevu", "tedavi", "krem", "yara", "ağrı", "agri", "aşı", "asi",
-    "tahlil", "kan", "klinik", "hap", "health", "doctor", "medicine", "clinic",
-    "pill", "dentist", "supplement", "vitamin",
-  ],
-  para_is: [
-    "para", "maaş", "maas", "fatura", "ödeme", "odeme", "banka", "döviz", "doviz",
-    "lira", "dolar", "euro", "toplantı", "toplanti", "müşteri", "musteri", "proje",
-    "vergi", "kira", "bütçe", "butce", "satış", "satis", "iş ", "işe", "fatura",
-    "work", "money", "invoice", "salary", "bank", "meeting", "client", "tax",
-    "rent", "budget", "project", "business",
-  ],
-  alisveris: [
-    "satın al", "satin al", "market", "alışveriş", "alisveris", "sipariş", "siparis",
-    "ekmek", "süt ", "sut ", "marketten", "bakkal", "buy", "grocery", "shopping",
-    "order", "cart",
-  ],
-  kisisel: [
-    "annem", "babam", "eşim", "esim", "arkadaş", "arkadas", "sevgili", "doğum günü",
-    "dogum gunu", "aile", "ziyaret", "abla", "abi", "kardeş", "kardes",
-    "personal", "family", "friend", "birthday", "mom", "dad", "sister", "brother",
-  ],
-  fikirler: [
-    "fikir", "belki", "acaba", "düşün", "dusun", "olabilir", "olsa", "idea",
-    "maybe", "what if", "concept",
-  ],
-  gorevler: [
-    "yap", "hallet", "gönder", "gonder", "ara", "tamamla", "bitir", "hatırlat",
-    "hatirlat", "öde", "git", "başla", "basla", "düzenle", "duzenle", "araştır",
-    "arastir", "kur", "task", "call", "send", "finish", "complete", "remind",
-  ],
+interface Rule {
+  phrases?: string[];
+  stems?: string[];
+  exact?: string[];
+}
+
+const RULES: Record<string, Rule> = {
+  saglik: {
+    phrases: ["göz muayene", "kan tahlili", "check up", "check-up"],
+    stems: [
+      "doktor", "hastane", "sağlık", "saglik", "eczane", "ilaç", "ilac",
+      "vitamin", "takviye", "tahlil", "tansiyon", "şurup", "surup", "ağrı",
+      "agri", "krem", "tedavi", "klinik", "muayene", "dişçi", "disci",
+      "randevu", "terapi", "psikolog", "egzersiz", "antrenman", "reçete",
+      "recete", "health", "doctor", "dentist", "medicine", "clinic",
+      "pill", "supplement", "workout", "therapy",
+    ],
+    exact: ["diş", "dis", "aşı", "asi", "hap", "spor", "gym"],
+  },
+  para_is: {
+    phrases: ["iş görüşmesi", "is gorusmesi", "para çek", "para cek", "para yatır", "para yatir"],
+    stems: [
+      "fatura", "ödeme", "odeme", "banka", "kredi", "taksit", "borç", "borc",
+      "maaş", "maas", "vergi", "kiray", "bütçe", "butce", "dekont", "havale",
+      "iban", "dolar", "euro", "sigorta", "abonelik", "toplantı", "toplanti",
+      "müşteri", "musteri", "proje", "rapor", "sunum", "mülakat", "mulakat",
+      "patron", "şirket", "sirket", "ofis", "mesai", "satış", "satis",
+      "invoice", "salary", "bank", "meeting", "client", "tax", "rent",
+      "budget", "report", "interview", "office", "business", "money",
+    ],
+    exact: ["iş", "para", "lira", "tl", "cv", "zam", "kira", "work"],
+  },
+  alisveris: {
+    phrases: [
+      "satın al", "satin al", "tuvalet kağıdı", "tuvalet kagidi",
+      "zeytin yağı", "zeytin yagi", "sipariş ver", "siparis ver",
+    ],
+    stems: [
+      "market", "alışveriş", "alisveris", "sipariş", "siparis", "kargo",
+      "iade", "indirim", "mağaza", "magaza", "bakkal", "manav", "ekmek",
+      "yumurta", "peynir", "zeytin", "kahve", "şeker", "seker", "makarna",
+      "pirinç", "pirinc", "deterjan", "şampuan", "sampuan", "sabun",
+      "domates", "patates", "soğan", "sogan", "tavuk", "kıyma", "kiyma",
+      "meyve", "sebze", "dondurma", "çikolata", "cikolata",
+      "grocery", "shopping", "order", "store", "cart",
+    ],
+    exact: ["süt", "sut", "çay", "cay", "un", "su", "tuz", "buy", "al"],
+  },
+  kisisel: {
+    phrases: ["doğum günü", "dogum gunu", "yıl dönümü", "yil donumu"],
+    stems: [
+      "anne", "baba", "abla", "kardeş", "kardes", "teyze", "hala", "amca",
+      "dayı", "dayi", "dede", "babaanne", "anneanne", "sevgili", "arkadaş",
+      "arkadas", "yıldönümü", "yildonumu", "hediye", "davet", "düğün",
+      "dugun", "ziyaret", "buluş", "bulus", "tatil", "misafir",
+      "family", "friend", "birthday", "gift", "visit", "wedding",
+    ],
+    exact: ["eş", "es", "abi", "dost", "aile", "mom", "dad"],
+  },
+  fikirler: {
+    phrases: ["ne olurdu", "olur mu", "what if"],
+    stems: [
+      "fikir", "belki", "acaba", "düşünce", "dusunce", "konsept", "hayal",
+      "idea", "maybe", "concept", "brainstorm",
+    ],
+    exact: [],
+  },
+  gorevler: {
+    phrases: ["randevu al", "iptal et", "geri ver", "geri al"],
+    stems: [
+      "hallet", "gönder", "gonder", "tamamla", "bitir", "hatırla", "hatirla",
+      "başla", "basla", "düzenle", "duzenle", "araştır", "arastir",
+      "temizle", "yıka", "yika", "ütüle", "utule", "yükle", "yukle",
+      "onayla", "imzala", "teslim", "uzat", "değiştir", "degistir",
+      "kontrol", "getir", "götür", "gotur", "hazırla", "hazirla", "planla",
+      "call", "send", "finish", "fix", "clean", "book", "cancel",
+      "submit", "install", "email", "remind",
+    ],
+    exact: ["yap", "ara", "git", "kur", "yaz", "oku", "sil", "öde", "ode", "indir", "sor", "al", "bak", "task"],
+  },
 };
 
+// İlk eşleşen kazanır — özelden genele doğru sıralı.
 const CATEGORY_PRIORITY = [
   "saglik",
   "para_is",
@@ -49,11 +102,36 @@ const CATEGORY_PRIORITY = [
   "gorevler",
 ];
 
-const HIGH_WORDS = [
-  "acil", "hemen", "bugün", "bugun", "şimdi", "simdi", "önemli", "onemli",
-  "son tarih", "deadline", "yarın", "yarin", "geç kalma", "kaçırma", "kacirma",
-  "urgent", "today", "now", "important", "asap",
+// Acil: bugüne/şu ana bağlı, kaçırılırsa bedeli olan işaretler.
+const HIGH_RULE: Rule = {
+  phrases: [
+    "son tarih", "son gün", "son gun", "geç kalma", "gec kalma",
+    "bugün bitmeli", "bugun bitmeli", "right now",
+  ],
+  stems: [
+    "acil", "hemen", "kaçırma", "kacirma", "mutlaka", "kritik",
+    "urgent", "asap", "deadline", "immediately",
+  ],
+  exact: ["bugün", "bugun", "şimdi", "simdi", "now", "today"],
+};
+
+// Önemli: yakın vadeli ya da vurgulu ama bugünlük değil.
+const MEDIUM_RULE: Rule = {
+  phrases: ["bu hafta", "this week", "en kısa", "en kisa"],
+  stems: [
+    "önemli", "onemli", "unutma", "haftaya", "yakında", "yakinda",
+    "important", "soon", "tomorrow",
+  ],
+  exact: ["yarın", "yarin"],
+};
+
+// Gün adı ya da saat görülen not en az Önemli sayılır.
+const DAY_WORDS = [
+  "pazartesi", "salı", "sali", "çarşamba", "carsamba", "perşembe",
+  "persembe", "cuma", "cumartesi", "pazar", "monday", "tuesday",
+  "wednesday", "thursday", "friday", "saturday", "sunday",
 ];
+const TIME_RE = /\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s*'?\s*[dt][ea]\b/;
 
 /** Türkçe-duyarsız karşılaştırma normalizasyonu (arama da bunu kullanır). */
 export function normalizeTr(s: string): string {
@@ -62,38 +140,61 @@ export function normalizeTr(s: string): string {
     .replace(/i̇/g, "i");
 }
 
-function categorize(line: string): string {
-  const n = normalizeTr(line);
+function tokensOf(n: string): string[] {
+  return n.split(/[^a-zçğıöşü0-9]+/).filter((t) => t.length > 0);
+}
+
+function matchRule(n: string, tokens: string[], rule: Rule): boolean {
+  if (rule.phrases?.some((p) => n.includes(p))) return true;
+  if (rule.exact?.some((w) => tokens.includes(w))) return true;
+  if (rule.stems?.some((s) => tokens.some((t) => t.startsWith(s)))) return true;
+  return false;
+}
+
+function categorize(n: string, tokens: string[]): string {
   for (const cat of CATEGORY_PRIORITY) {
-    if (KEYWORDS[cat].some((w) => n.includes(w))) return cat;
+    if (matchRule(n, tokens, RULES[cat])) return cat;
   }
   return "notlar";
 }
 
-function prioritize(line: string, category: string): Priority {
-  const n = normalizeTr(line);
-  if (HIGH_WORDS.some((w) => n.includes(w))) return "high";
-  if (category === "gorevler") return "medium";
+function prioritize(n: string, tokens: string[], category: string): Priority {
+  if (/!{2,}/.test(n) || matchRule(n, tokens, HIGH_RULE)) return "high";
+  if (
+    n.includes("!") ||
+    matchRule(n, tokens, MEDIUM_RULE) ||
+    TIME_RE.test(n) ||
+    tokens.some((t) => DAY_WORDS.includes(t)) ||
+    category === "gorevler" ||
+    // Eylem fiili içeren not yapılacak iştir — ama bir fikir ("belki…") değilse.
+    (category !== "fikirler" && matchRule(n, tokens, RULES.gorevler))
+  ) {
+    return "medium";
+  }
   return "low";
 }
 
 /** Tek satır için kategori + öncelik önerisi. */
 export function classifyLine(line: string): { category: string; priority: Priority } {
-  const category = categorize(line);
-  return { category, priority: prioritize(line, category) };
+  const n = normalizeTr(line);
+  const tokens = tokensOf(n);
+  const category = categorize(n, tokens);
+  return { category, priority: prioritize(n, tokens, category) };
 }
 
 function splitLines(text: string): string[] {
-  // Split on newlines first, then commas/semicolons (list heuristic), then bullets.
   const parts = text
     .split(/\r?\n+/)
     .flatMap((l) => {
-      // Split on comma/semicolon separators if it looks like a list
+      // Virgül/noktalı virgül listesi: yalnızca her parça kısaysa böl
+      // ("süt, yumurta, ekmek" bölünür; virgüllü uzun cümle bütün kalır).
       const byComma = l
         .split(/[,;]\s+/)
         .map((p) => p.trim())
         .filter((p) => p.length > 0);
-      if (byComma.length > 1) return byComma;
+      if (byComma.length > 1 && byComma.every((p) => p.split(/\s+/).length <= 5)) {
+        return byComma;
+      }
       return [l];
     })
     .flatMap((l) => l.split(/(?:^|\s)[•·]\s+/))
