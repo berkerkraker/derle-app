@@ -6,7 +6,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { EditSheetProvider } from "@/src/context/EditSheetContext";
-import { WelcomeOverlay } from "@/src/components/WelcomeOverlay";
 import { storage } from "@/src/utils/storage";
 import { setHapticsEnabled } from "@/src/lib/haptics";
 import { StatusBar } from "expo-status-bar";
@@ -14,7 +13,6 @@ import { StatusBar } from "expo-status-bar";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
 import { I18nProvider } from "@/src/i18n/I18nContext";
-import { AuthProvider } from "@/src/context/AuthContext";
 import { NotesProvider } from "@/src/context/NotesContext";
 import { ToastProvider } from "@/src/components/Toast";
 
@@ -38,7 +36,6 @@ function ThemedNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" options={{ presentation: "modal" }} />
         <Stack.Screen name="legal" options={{ presentation: "modal" }} />
-        <Stack.Screen name="delete-account" options={{ presentation: "modal" }} />
       </Stack>
     </>
   );
@@ -65,16 +62,13 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <ThemeProvider>
             <I18nProvider>
-              <AuthProvider>
-                <NotesProvider>
-                  <ToastProvider>
-                    <EditSheetProvider>
-                      <ThemedNavigator />
-                      <WelcomeOverlay />
-                    </EditSheetProvider>
-                  </ToastProvider>
-                </NotesProvider>
-              </AuthProvider>
+              <NotesProvider>
+                <ToastProvider>
+                  <EditSheetProvider>
+                    <ThemedNavigator />
+                  </EditSheetProvider>
+                </ToastProvider>
+              </NotesProvider>
             </I18nProvider>
           </ThemeProvider>
         </SafeAreaProvider>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 
 import { Checkbox } from "@/src/components/Checkbox";
 import { CategoryChip } from "@/src/components/CategoryChip";
@@ -33,7 +33,7 @@ const NEXT_PRIORITY: Record<Priority, Priority> = {
 export function NoteRow({ note, onEdit, variant, isLast }: Props) {
   const { colors, scheme } = useTheme();
   const { t, lang } = useI18n();
-  const { toggleDone, togglePinned, deleteNote, updateNote } = useNotes();
+  const { toggleDone, deleteNote, updateNote } = useNotes();
   const { show } = useToast();
 
   const [pendingDone, setPendingDone] = useState(false);
@@ -81,16 +81,22 @@ export function NoteRow({ note, onEdit, variant, isLast }: Props) {
     updateNote(note.id, { priority: NEXT_PRIORITY[note.priority] ?? "medium" });
   };
 
+  const onDelete = () => {
+    haptics.warning();
+    deleteNote(note.id);
+    show(t("note.deleted"), {
+      label: t("common.undo"),
+      onPress: () => updateNote(note.id, { deleted: false }),
+    });
+  };
+
   const prColor = PRIORITY_COLOR[note.priority];
   const prLow = note.priority === "low";
 
   const renderRightActions = () => (
     <Pressable
       testID={`note-delete-${note.id}`}
-      onPress={() => {
-        haptics.warning();
-        deleteNote(note.id);
-      }}
+      onPress={onDelete}
       style={[styles.deleteAction, { backgroundColor: colors.danger }]}
     >
       <Feather name="trash-2" size={20} color="#FFFFFF" />
@@ -165,22 +171,6 @@ export function NoteRow({ note, onEdit, variant, isLast }: Props) {
             )}
           </View>
         </Pressable>
-
-        <Pressable
-          hitSlop={8}
-          onPress={() => {
-            haptics.light();
-            togglePinned(note.id);
-          }}
-          style={styles.pin}
-          testID={`note-pin-${note.id}`}
-        >
-          <Ionicons
-            name={note.pinned ? "star" : "star-outline"}
-            size={16}
-            color={note.pinned ? colors.important : colors.textMuted}
-          />
-        </Pressable>
       </View>
     </ReanimatedSwipeable>
   );
@@ -229,9 +219,6 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 13,
     fontWeight: "500",
-  },
-  pin: {
-    padding: 4,
   },
   deleteAction: {
     width: 72,

@@ -10,10 +10,14 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native (expo prebuild çıktısı — kaynak gerçekliği app.json'dur)
+/android
+/ios
+/dist-release
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -31,8 +35,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files — hiçbir .env varyantı repoya girmez
+.env
+.env.*
 
 # typescript
 *.tsbuildinfo

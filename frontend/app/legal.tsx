@@ -11,20 +11,21 @@ const CONTENT: Record<string, { tr: { title: string; body: string }; en: { title
   privacy: {
     tr: {
       title: "Gizlilik Politikası",
-      body: `Derle, notlarını düzenlemen için tasarlanmış bir uygulamadır. Gizliliğine önem veriyoruz.
+      body: `Derle, aklındakileri hızla not alıp düzenlemen için tasarlandı. Gizlilik ilkemiz basit: verin bizde değil, sende.
 
 TOPLANAN VERİLER
-• Notların: Yazdığın notlar cihazında saklanır. Google ile giriş yaparsan, yedekleme ve senkronizasyon için notların sana özel olarak güvenli bir sunucu veritabanında tutulur.
-• Hesap bilgisi: Google ile giriş yaparsan yalnızca e-posta adresin, adın ve profil resmin kimlik doğrulama amacıyla alınır. Notların Gmail'e veya Google hizmetlerine kaydedilmez.
+• Hiçbir veri toplamıyoruz. Derle hesap istemez, sunucuya bağlanmaz, analitik veya reklam kimliği kullanmaz.
+• Notların yalnızca cihazının uygulama deposunda saklanır.
 
-YAPAY ZEKA
-• Bir not eklediğinde, metni düzenlemek (yazım düzeltme ve uygun kategoriye ayırma) için güvenli sunucumuza gönderilir; sunucu bu metni OpenAI API'sine iletir. Metin yalnızca bu işlem için kullanılır, reklam için kullanılmaz. Yapay zeka kullanılamazsa not cihazında düzenlenir ve asla kaybolmaz.
+DERLE MOTORU
+• "Derle" özelliği tamamen cihazında çalışır; metnin internete gönderilmez. İnternet yokken de aynı şekilde çalışır.
 
-VERİLERİN PAYLAŞIMI
-• Verilerin üçüncü taraflara satılmaz. Yalnızca yukarıda belirtilen işlevler için kullanılır.
+YEDEKLEME
+• Android, uygulama verini cihaz yedeğine (Google hesabındaki standart cihaz yedeklemesi) dahil edebilir. Bu yedek Google'ın sistemidir; bizim erişimimiz yoktur.
+• Ayarlar'dan notlarını istediğin an dosya olarak dışa aktarabilirsin.
 
 VERİLERİN SİLİNMESİ
-• Uygulama içinden "Hesabı ve verileri sil" seçeneğiyle hesabını ve buluttaki tüm notlarını kalıcı olarak silebilirsin.
+• Ayarlar → "Bu cihazdaki notları sil" ile tüm notlarını silebilirsin. Uygulamayı kaldırmak da tüm veriyi kaldırır.
 
 İLETİŞİM
 • support@yamanlabs.app
@@ -32,20 +33,21 @@ VERİLERİN SİLİNMESİ
     },
     en: {
       title: "Privacy Policy",
-      body: `Derle is an app designed to help you organize your notes. We care about your privacy.
+      body: `Derle is designed for quickly capturing and organizing what's on your mind. Our privacy principle is simple: your data stays with you, not with us.
 
 DATA WE COLLECT
-• Your notes: Notes are stored on your device. If you sign in with Google, your notes are kept privately in a secure server database for backup and sync.
-• Account info: If you sign in with Google, we only use your email, name and profile picture for authentication. Your notes are NOT saved to Gmail or Google services.
+• We collect nothing. Derle requires no account, connects to no server, and uses no analytics or advertising identifiers.
+• Your notes are stored only in the app storage on your device.
 
-AI
-• When you add a note, the text is sent to our secure server to be tidied (spelling fixes and category sorting); the server forwards it to the OpenAI API. The text is used only for this purpose, never for ads. If AI is unavailable, the note is organized on your device and is never lost.
+THE DERLE ENGINE
+• The "Derle" feature runs entirely on your device; your text is never sent to the internet. It works the same offline.
 
-DATA SHARING
-• Your data is never sold to third parties. It is used only for the features described above.
+BACKUP
+• Android may include app data in your device backup (the standard device backup on your Google account). That backup belongs to Google's system; we have no access to it.
+• You can export your notes as a file anytime from Settings.
 
 DATA DELETION
-• You can permanently delete your account and all cloud notes from inside the app via "Delete account & data".
+• Settings → "Delete notes on this device" removes all your notes. Uninstalling the app also removes all data.
 
 CONTACT
 • support@yamanlabs.app
@@ -60,7 +62,8 @@ CONTACT
 • Derle kişisel not alma amaçlıdır. Uygulamayı yasalara uygun şekilde kullanmalısın.
 • Notlarının içeriğinden sen sorumlusun.
 • Uygulama "olduğu gibi" sunulur; kesintisiz veya hatasız çalışacağı garanti edilmez.
-• Yapay zeka özelliği yardımcı niteliktedir; sonuçların doğruluğu garanti edilmez.
+• Derle motoru yardımcı niteliktedir; kategori ve öncelik önerilerinin doğruluğu garanti edilmez.
+• Notlar cihazında saklanır; cihazın kaybı/sıfırlanması durumunda yedeğin yoksa notlar geri getirilemez.
 • Bu koşullar zaman zaman güncellenebilir.
 
 İletişim: support@yamanlabs.app`,
@@ -72,7 +75,8 @@ CONTACT
 • Derle is intended for personal note-taking. You must use it lawfully.
 • You are responsible for the content of your notes.
 • The app is provided "as is"; we do not guarantee uninterrupted or error-free operation.
-• The AI feature is assistive; the accuracy of results is not guaranteed.
+• The Derle engine is assistive; the accuracy of category and priority suggestions is not guaranteed.
+• Notes are stored on your device; if the device is lost or reset and you have no backup, notes cannot be recovered.
 • These terms may be updated from time to time.
 
 Contact: support@yamanlabs.app`,
@@ -87,9 +91,10 @@ E-posta: support@yamanlabs.app
 Web: https://yamanlabs.app/support
 
 Sık sorulanlar:
-• Notlarım nerede saklanıyor? Cihazında; Google ile giriş yaparsan ayrıca buluta yedeklenir.
-• İnternet yokken çalışır mı? Evet, çevrimdışı çalışır; internet gelince senkronize olur.
-• Yapay zeka çalışmazsa? Notun yine kaydolur, cihazında düzenlenir.`,
+• Notlarım nerede saklanıyor? Yalnızca cihazında. Hesap ve bulut yoktur.
+• İnternet yokken çalışır mı? Evet — Derle tamamen çevrimdışı çalışır.
+• Telefon değiştirirsem? Ayarlar → "Yedeği paylaş / kaydet" ile yedeğini al; yeni cihazda "Panodan içe aktar" ile geri yükle.
+• Derle butonu ne yapar? Metin varken yazdıklarını ayrı notlara böler ve kategorilere dağıtır; kutu boşken Notlar'da bekleyenleri toparlamayı önerir. Onay vermeden hiçbir şey değişmez.`,
     },
     en: {
       title: "Support",
@@ -99,9 +104,10 @@ Email: support@yamanlabs.app
 Web: https://yamanlabs.app/support
 
 FAQ:
-• Where are my notes stored? On your device; if you sign in with Google they are also backed up to the cloud.
-• Does it work offline? Yes, it works offline and syncs when you reconnect.
-• What if AI fails? Your note is still saved and organized on your device.`,
+• Where are my notes stored? Only on your device. There is no account or cloud.
+• Does it work offline? Yes — Derle works fully offline.
+• Switching phones? Settings → "Share / save backup" to export; restore with "Import from clipboard" on the new device.
+• What does the Derle button do? With text, it splits what you wrote into separate notes and files them into categories; with the box empty, it offers to tidy notes waiting in Notes. Nothing changes until you confirm.`,
     },
   },
 };

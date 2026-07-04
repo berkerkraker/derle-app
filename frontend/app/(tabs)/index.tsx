@@ -6,11 +6,10 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import {
   KeyboardAwareScrollView,
   KeyboardStickyView,
@@ -26,20 +25,21 @@ import { NoteRow } from "@/src/components/NoteRow";
 import { DerlePreview } from "@/src/components/DerlePreview";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
-import {
-  useNotes,
-  selectPriorityNotes,
-  OrganizePreview,
-} from "@/src/context/NotesContext";
-import { useAuth } from "@/src/context/AuthContext";
+import { useNotes, selectPriorityNotes } from "@/src/context/NotesContext";
 import { useToast } from "@/src/components/Toast";
 import { useEditSheet } from "@/src/context/EditSheetContext";
 import { CATEGORIES, CATEGORY_ORDER, resolveCategory } from "@/src/constants/categories";
+import { OrganizedItem } from "@/src/types";
+import { TidyItem } from "@/src/lib/localOrganize";
 import { headerDate } from "@/src/lib/format";
 import { haptics } from "@/src/lib/haptics";
 import { storage } from "@/src/utils/storage";
 
 const RECENT_KEY = "derle.recentCats";
+
+type PreviewState =
+  | { mode: "split"; items: OrganizedItem[] }
+  | { mode: "tidy"; items: TidyItem[] };
 
 export default function CaptureScreen() {
   const { colors, scheme } = useTheme();
@@ -48,14 +48,13 @@ export default function CaptureScreen() {
   const router = useRouter();
   const {
     notes,
-    processing,
-    syncing,
     addManual,
     previewOrganize,
     addOrganized,
+    tidyInbox,
+    applyTidy,
     customCategories,
   } = useNotes();
-  const { token } = useAuth();
   const { show } = useToast();
   const { openEdit } = useEditSheet();
 
@@ -63,7 +62,7 @@ export default function CaptureScreen() {
   const [text, setText] = useState("");
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
-  const [preview, setPreview] = useState<OrganizePreview | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
 
   useEffect(() => {
     storage.getItem(RECENT_KEY, "").then((raw) => {
@@ -108,10 +107,10 @@ export default function CaptureScreen() {
     return out;
   }, [recent, customCategories]);
 
-  // Yıldızlılar: tek düz liste, öncelik sırasına göre (Acil > Önemli > Normal).
-  const starred = useMemo(() => selectPriorityNotes(notes), [notes]);
+  // Vitrin: bitmemiş Acil + Önemli notlar, acilden başlayarak.
+  // Normal notlar ana ekranı doldurmaz; onlar Düzen'de yaşar.
+  const focusList = useMemo(() => selectPriorityNotes(notes), [notes]);
 
-  // Button enabled as soon as there is text — adding is always instant
   const canAdd = text.trim().length > 0;
 
   const catLabel = (id: string) =>
@@ -131,27 +130,42 @@ export default function CaptureScreen() {
     }
   };
 
-  const onDerle = async () => {
-    const value = text.trim();
-    if (!value || processing) return;
+  // ✨ Derle: metin varsa böl + kategorile; kutu boşken bekleyen kategorisiz
+  // notları toparlamayı önerir. İki yolda da onaysız hiçbir şey değişmez.
+  const onDerle = () => {
     haptics.light();
-    const res = await previewOrganize(value);
-    if (!res.items.length) {
-      show(t("capture.derleFail"));
+    const value = text.trim();
+    if (value) {
+      const items = previewOrganize(value);
+      if (!items.length) {
+        show(t("capture.derleFail"));
+        return;
+      }
+      setPreview({ mode: "split", items });
       return;
     }
-    setPreview(res);
+    const tidy = tidyInbox();
+    if (!tidy.length) {
+      show(t("capture.tidyNone"));
+      return;
+    }
+    setPreview({ mode: "tidy", items: tidy });
   };
 
   const onPreviewConfirm = () => {
     if (!preview) return;
-    const res = addOrganized(preview.items);
+    if (preview.mode === "split") {
+      const res = addOrganized(preview.items);
+      setText("");
+      if (res.count === 1)
+        show(t("capture.addedOne", { cat: catLabel(res.categories[0]) }));
+      else show(t("capture.addedMany", { n: res.count }));
+    } else {
+      const moved = applyTidy(preview.items);
+      show(t("capture.tidied", { n: moved }));
+    }
     setPreview(null);
-    setText("");
     haptics.success();
-    if (res.count === 1)
-      show(t("capture.addedOne", { cat: catLabel(res.categories[0]) }));
-    else show(t("capture.addedMany", { n: res.count }));
   };
 
   const onPreviewSingle = () => {
@@ -168,17 +182,6 @@ export default function CaptureScreen() {
     >
       {/* top bar */}
       <View style={styles.topBar}>
-        {token ? (
-          <View style={styles.backup} testID="backup-indicator">
-            {syncing ? (
-              <ActivityIndicator size="small" color={colors.brand} />
-            ) : (
-              <Feather name="cloud" size={18} color={colors.brand} />
-            )}
-          </View>
-        ) : (
-          <View style={styles.backup} />
-        )}
         <Pressable
           testID="open-settings"
           hitSlop={10}
@@ -272,18 +275,18 @@ export default function CaptureScreen() {
           <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
             {t("capture.priority")}
           </Text>
-          {starred.length > 0 && (
+          {focusList.length > 0 && (
             <View style={[styles.countBadge, { backgroundColor: colors.input }]}>
               <Text style={[styles.countText, { color: colors.textSecondary }]}>
-                {starred.length}
+                {focusList.length}
               </Text>
             </View>
           )}
         </View>
 
-        {starred.length === 0 ? (
+        {focusList.length === 0 ? (
           <View style={styles.empty} testID="capture-empty">
-            <Ionicons name="star-outline" size={22} color={colors.textMuted} />
+            <Feather name="check-circle" size={22} color={colors.textMuted} />
             <Text
               style={[styles.emptyTitle, { color: colors.textSecondary }]}
             >
@@ -303,7 +306,7 @@ export default function CaptureScreen() {
               },
             ]}
           >
-            {starred.map((n, i) => (
+            {focusList.map((n, i) => (
               <Animated.View
                 key={n.id}
                 layout={LinearTransition.springify().damping(18)}
@@ -314,7 +317,7 @@ export default function CaptureScreen() {
                   note={n}
                   onEdit={openEdit}
                   variant="capture"
-                  isLast={i === starred.length - 1}
+                  isLast={i === focusList.length - 1}
                 />
               </Animated.View>
             ))}
@@ -337,35 +340,23 @@ export default function CaptureScreen() {
             <Pressable
               testID="derle-button"
               onPress={onDerle}
-              disabled={!canAdd || processing}
               style={[
                 styles.derleBtn,
                 {
                   backgroundColor: colors.card,
-                  borderColor: canAdd ? colors.brand : colors.cardBorder,
+                  borderColor: colors.brand,
                 },
               ]}
             >
-              {processing ? (
-                <ActivityIndicator size="small" color={colors.brand} />
-              ) : (
-                <>
-                  <Icon
-                    family="ionicons"
-                    name="sparkles-outline"
-                    size={16}
-                    color={canAdd ? colors.brand : colors.textMuted}
-                  />
-                  <Text
-                    style={[
-                      styles.derleText,
-                      { color: canAdd ? colors.brand : colors.textMuted },
-                    ]}
-                  >
-                    {t("capture.derle")}
-                  </Text>
-                </>
-              )}
+              <Icon
+                family="ionicons"
+                name="sparkles-outline"
+                size={16}
+                color={colors.brand}
+              />
+              <Text style={[styles.derleText, { color: colors.brand }]}>
+                {t("capture.derle")}
+              </Text>
             </Pressable>
             <Pressable
               testID="add-note-button"
@@ -398,7 +389,7 @@ export default function CaptureScreen() {
       <DerlePreview
         visible={preview !== null}
         items={preview?.items ?? []}
-        source={preview?.source}
+        mode={preview?.mode ?? "split"}
         onConfirm={onPreviewConfirm}
         onSingle={onPreviewSingle}
         onCancel={() => setPreview(null)}
@@ -412,15 +403,9 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     paddingHorizontal: 20,
     height: 44,
-  },
-  backup: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
   },
   gear: {
     width: 38,

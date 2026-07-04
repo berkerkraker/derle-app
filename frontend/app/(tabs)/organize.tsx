@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -15,6 +15,7 @@ import { NoteRow } from "@/src/components/NoteRow";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 import { useNotes, priorityWeight } from "@/src/context/NotesContext";
+import { normalizeTr } from "@/src/lib/localOrganize";
 import { useEditSheet } from "@/src/context/EditSheetContext";
 import {
   CATEGORIES,
@@ -33,6 +34,7 @@ export default function OrganizeScreen() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [doneOpen, setDoneOpen] = useState(false);
   const [doneCollapsed, setDoneCollapsed] = useState<Record<string, boolean>>({});
+  const [query, setQuery] = useState("");
 
   const orderedCatIds = useMemo(
     () => [...CATEGORY_ORDER, ...customCategories.map((c) => c.id)],
@@ -69,6 +71,24 @@ export default function OrganizeScreen() {
   const totalDone = doneGroups.reduce((s, g) => s + g.items.length, 0);
   const isEmpty = groups.length === 0 && doneGroups.length === 0;
 
+  // Arama: Türkçe-duyarsız metin eşleşmesi; aktifler önce (önem sırasıyla),
+  // tamamlananlar sonda. Boş sorgu = normal kategori görünümü.
+  const searchResults = useMemo(() => {
+    const nq = normalizeTr(query.trim());
+    if (!nq) return null;
+    const matches = notes.filter((n) => normalizeTr(n.text).includes(nq));
+    const active = matches
+      .filter((n) => !n.done)
+      .sort(
+        (a, b) =>
+          priorityWeight(b) - priorityWeight(a) || b.updatedAt - a.updatedAt,
+      );
+    const done = matches
+      .filter((n) => n.done)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...active, ...done];
+  }, [query, notes]);
+
   const catLabel = (id: string) =>
     CATEGORIES[id]
       ? t(`cat.${id}`)
@@ -95,6 +115,33 @@ export default function OrganizeScreen() {
         </Pressable>
       </View>
 
+      <View
+        style={[
+          styles.searchWrap,
+          { backgroundColor: colors.card, borderColor: colors.cardBorder },
+        ]}
+      >
+        <Feather name="search" size={17} color={colors.textMuted} />
+        <TextInput
+          testID="organize-search"
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t("organize.search")}
+          placeholderTextColor={colors.textMuted}
+          returnKeyType="search"
+          style={[styles.searchInput, { color: colors.inputText }]}
+        />
+        {query.length > 0 && (
+          <Pressable
+            hitSlop={8}
+            onPress={() => setQuery("")}
+            testID="organize-search-clear"
+          >
+            <Feather name="x-circle" size={17} color={colors.textMuted} />
+          </Pressable>
+        )}
+      </View>
+
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -102,8 +149,35 @@ export default function OrganizeScreen() {
           paddingBottom: insets.bottom + 28,
         }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {isEmpty ? (
+        {searchResults !== null ? (
+          searchResults.length === 0 ? (
+            <View style={styles.empty} testID="search-empty">
+              <Feather name="search" size={26} color={colors.textMuted} />
+              <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
+                {t("organize.noResults")}
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+              ]}
+            >
+              {searchResults.map((n, i) => (
+                <NoteRow
+                  key={n.id}
+                  note={n}
+                  onEdit={openEdit}
+                  variant="organize"
+                  isLast={i === searchResults.length - 1}
+                />
+              ))}
+            </View>
+          )
+        ) : isEmpty ? (
           <View style={styles.empty} testID="organize-empty">
             <Feather name="inbox" size={26} color={colors.textMuted} />
             <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
@@ -372,6 +446,22 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
+  },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 14,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 13,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15.5,
+    paddingVertical: 0,
   },
   section: { marginBottom: 22 },
   doneSectionWrap: { marginTop: 4 },

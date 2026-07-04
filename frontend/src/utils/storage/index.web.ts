@@ -45,25 +45,6 @@ export class Storage extends StorageBase {
       return false;
     }
   }
-
-  // Browsers have no Keychain — secure* helpers fall through to AsyncStorage.
-  async secureGet<Fallback extends StorageItemValue>(
-    key: string,
-    fallback: Fallback,
-  ): Promise<Fallback | null> {
-    return this.getItem(key, fallback);
-  }
-
-  async secureSet<Value extends StorageItemValue>(
-    key: string,
-    value: Value,
-  ): Promise<boolean> {
-    return this.setItem(key, value);
-  }
-
-  async secureRemove(key: string): Promise<boolean> {
-    return this.removeItem(key);
-  }
 }
 
 export const storage = new Storage();

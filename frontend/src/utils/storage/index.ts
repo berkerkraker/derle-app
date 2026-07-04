@@ -4,7 +4,6 @@
 // Usage: import { storage } from "@/src/utils/storage"; await storage.getItem(key, fallback);
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 
 import { AssertNoExtras, StorageBase, StorageItemValue } from "./storage-base";
 
@@ -42,43 +41,6 @@ export class Storage extends StorageBase {
       return true;
     } catch (e) {
       this.warn("removeItem", key, e);
-      return false;
-    }
-  }
-
-  // Sensitive values — Keychain (iOS) / EncryptedSharedPreferences (Android).
-  async secureGet<Fallback extends StorageItemValue>(
-    key: string,
-    fallback: Fallback,
-  ): Promise<Fallback | null> {
-    try {
-      const raw = await SecureStore.getItemAsync(key);
-      return this.retrieve(raw, fallback);
-    } catch (e) {
-      this.warn("secureGet", key, e);
-      return fallback;
-    }
-  }
-
-  async secureSet<Value extends StorageItemValue>(
-    key: string,
-    value: Value,
-  ): Promise<boolean> {
-    try {
-      await SecureStore.setItemAsync(key, JSON.stringify(value));
-      return true;
-    } catch (e) {
-      this.warn("secureSet", key, e);
-      return false;
-    }
-  }
-
-  async secureRemove(key: string): Promise<boolean> {
-    try {
-      await SecureStore.deleteItemAsync(key);
-      return true;
-    } catch (e) {
-      this.warn("secureRemove", key, e);
       return false;
     }
   }

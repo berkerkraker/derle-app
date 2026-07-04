@@ -13,7 +13,7 @@ export abstract class StorageBase {
     console.warn(`[storage] ${op}(${key}) failed`, e);
   }
 
-  // raw is whatever AsyncStorage / SecureStore returned: a JSON-encoded string
+  // raw is whatever AsyncStorage returned: a JSON-encoded string
   // (because setItem always JSON.stringifies) or null if the key was missing.
   // We always JSON.parse so values round-trip correctly across types.
   protected retrieve<Fallback extends StorageItemValue>(
@@ -38,13 +38,4 @@ export abstract class StorageBase {
     value: Value,
   ): Promise<boolean>;
   abstract removeItem(key: string): Promise<boolean>;
-  abstract secureGet<Fallback extends StorageItemValue>(
-    key: string,
-    fallback: Fallback,
-  ): Promise<Fallback | null>;
-  abstract secureSet<Value extends StorageItemValue>(
-    key: string,
-    value: Value,
-  ): Promise<boolean>;
-  abstract secureRemove(key: string): Promise<boolean>;
 }

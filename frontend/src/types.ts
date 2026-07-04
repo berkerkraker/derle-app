@@ -7,6 +7,7 @@ export interface Note {
   text: string;
   category: string;
   priority: Priority;
+  /** v1.2 kalıntısı (yıldız). UI artık okumuyor; eski kayıtlar için tutulur. */
   pinned: boolean;
   done: boolean;
   createdAt: number;
@@ -19,13 +20,6 @@ export interface CustomCategory {
   id: string;
   label: string;
   color: string;
-}
-
-export interface AuthUser {
-  user_id: string;
-  email: string;
-  name: string;
-  picture: string;
 }
 
 export interface OrganizedItem {

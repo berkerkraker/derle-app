@@ -6,7 +6,7 @@ import {
   TextInput,
   StyleSheet,
   Switch,
-  ActivityIndicator,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -19,7 +19,6 @@ import { SegmentedControl } from "@/src/components/SegmentedControl";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 import { useNotes } from "@/src/context/NotesContext";
-import { useAuth } from "@/src/context/AuthContext";
 import { useToast } from "@/src/components/Toast";
 import { storage } from "@/src/utils/storage";
 import { haptics, setHapticsEnabled } from "@/src/lib/haptics";
@@ -28,14 +27,13 @@ import Constants from "expo-constants";
 
 const HAPTICS_KEY = "derle.haptics";
 
-type SectionKey = "cats" | "data" | "privacy" | null;
+type SectionKey = "cats" | "data" | "about" | null;
 
 export default function SettingsScreen() {
   const { colors, mode, setMode } = useTheme();
   const { t, lang, setLang } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, signInWithGoogle, signOut } = useAuth();
   const {
     customCategories,
     addCustomCategory,
@@ -50,12 +48,16 @@ export default function SettingsScreen() {
   const [catName, setCatName] = useState("");
   const [catColor, setCatColor] = useState(CUSTOM_COLOR_CHOICES[0]);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(true);
 
   useEffect(() => {
     storage.getItem<string>(HAPTICS_KEY, "1").then((v) => setHapticsOn(v !== "0"));
   }, []);
+
+  // bölüm kapanınca yarım kalmış silme onayı sıfırlanır
+  useEffect(() => {
+    if (open !== "data") setConfirmClear(false);
+  }, [open]);
 
   const onToggleHaptics = (v: boolean) => {
     setHapticsOn(v);
@@ -68,15 +70,17 @@ export default function SettingsScreen() {
     setOpen((cur) => (cur === k ? null : k));
   };
 
-  const onSignIn = async () => {
-    setSigningIn(true);
-    const res = await signInWithGoogle();
-    setSigningIn(false);
-    if (res.ok) show(t("settings.backupOn"));
-    else if (res.error !== "cancelled") show(t("settings.signInFailed"));
+  // Dışa aktarma paylaşım sayfasından: kullanıcı Drive/e-posta/dosya seçer.
+  const onExport = async () => {
+    const json = exportJSON();
+    try {
+      await Share.share({ title: "Derle yedek", message: json });
+    } catch {
+      /* kullanıcı vazgeçti */
+    }
   };
 
-  const onExport = async () => {
+  const onCopy = async () => {
     const json = exportJSON();
     await Clipboard.setStringAsync(json);
     let count = 0;
@@ -106,6 +110,7 @@ export default function SettingsScreen() {
     clearLocal();
     setConfirmClear(false);
     haptics.warning();
+    show(t("settings.cleared"));
   };
 
   const onAddCat = () => {
@@ -137,7 +142,7 @@ export default function SettingsScreen() {
         bottomOffset={20}
         showsVerticalScrollIndicator={false}
       >
-        {/* GÖRÜNÜM — Tema + Dil compact card */}
+        {/* TEMA */}
         <Text style={[styles.label, { color: colors.textMuted }]}>{t("settings.theme")}</Text>
         <SegmentedControl
           testIDPrefix="theme"
@@ -150,7 +155,7 @@ export default function SettingsScreen() {
           ]}
         />
 
-        {/* LANGUAGE — compact inline pill toggle */}
+        {/* DİL + Titreşim */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder, marginTop: 14 }]}>
           <View style={styles.compactRow}>
             <Text style={[styles.rowLabel, { color: colors.text }]}>
@@ -202,77 +207,9 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* ACCOUNT */}
-        <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
-          {t("settings.account")}
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          {user ? (
-            <View style={{ gap: 14 }}>
-              <View style={styles.accountRow}>
-                <View style={[styles.avatar, { backgroundColor: colors.brand }]}>
-                  <Text style={{ color: colors.brandText, fontWeight: "800", fontSize: 18 }}>
-                    {(user.name || user.email || "?").charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.accountName, { color: colors.text }]} numberOfLines={1}>
-                    {user.name || user.email}
-                  </Text>
-                  <View style={styles.backupLine}>
-                    <Feather name="check-circle" size={13} color={colors.brand} />
-                    <Text style={[styles.backupText, { color: colors.brand }]} numberOfLines={2}>
-                      {t("settings.backupOn")}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <Pressable
-                testID="sign-out"
-                onPress={() => {
-                  haptics.light();
-                  signOut();
-                }}
-                style={[styles.outlineBtn, { borderColor: colors.cardBorder }]}
-              >
-                <Feather name="log-out" size={17} color={colors.textSecondary} />
-                <Text style={[styles.outlineBtnText, { color: colors.textSecondary }]}>
-                  {t("settings.signOut")}
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={{ gap: 12 }}>
-              <Pressable
-                testID="sign-in-google"
-                onPress={onSignIn}
-                disabled={signingIn}
-                style={[styles.googleBtn, { backgroundColor: colors.brand }]}
-              >
-                {signingIn ? (
-                  <ActivityIndicator color={colors.brandText} />
-                ) : (
-                  <>
-                    <Feather name="log-in" size={18} color={colors.brandText} />
-                    <Text style={[styles.googleText, { color: colors.brandText }]}>
-                      {t("settings.signIn")}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-              <Text style={[styles.subText, { color: colors.textSecondary }]}>
-                {t("settings.signInSub")}
-              </Text>
-              <Text style={[styles.subText, { color: colors.textMuted }]}>
-                {t("settings.notSignedIn")}
-              </Text>
-            </View>
-          )}
-        </View>
-
         <View style={{ height: 22 }} />
 
-        {/* CUSTOM CATEGORIES */}
+        {/* ÖZEL KATEGORİLER */}
         <CollapsibleCard
           colors={colors}
           iconFamily="feather"
@@ -350,7 +287,7 @@ export default function SettingsScreen() {
           </View>
         </CollapsibleCard>
 
-        {/* DATA */}
+        {/* YEDEK & VERİ */}
         <CollapsibleCard
           colors={colors}
           iconFamily="feather"
@@ -360,18 +297,30 @@ export default function SettingsScreen() {
           onToggle={() => toggle("data")}
           testID="section-data"
         >
-          <ActionRow icon="upload" label={t("settings.export")} onPress={onExport} colors={colors} testID="export-notes" />
+          <ActionRow icon="share" label={t("settings.export")} onPress={onExport} colors={colors} testID="export-notes" />
+          <ActionRow icon="copy" label={t("settings.copy")} onPress={onCopy} colors={colors} testID="copy-notes" />
           <ActionRow icon="download" label={t("settings.import")} onPress={onImport} colors={colors} testID="import-notes" />
+          <ActionRow
+            icon="trash-2"
+            label={confirmClear ? t("settings.clearConfirm") : t("settings.clearLocal")}
+            onPress={onClear}
+            colors={colors}
+            danger
+            testID="clear-local"
+          />
+          <Text style={[styles.subText, { color: colors.textMuted, marginTop: 6 }]}>
+            {t("settings.localInfo")}
+          </Text>
         </CollapsibleCard>
 
-        {/* PRIVACY */}
+        {/* GİZLİLİK & HAKKINDA */}
         <CollapsibleCard
           colors={colors}
           iconFamily="feather"
           iconName="lock"
           title={t("settings.privacy")}
-          open={open === "privacy"}
-          onToggle={() => toggle("privacy")}
+          open={open === "about"}
+          onToggle={() => toggle("about")}
           testID="section-privacy"
         >
           <ActionRow
@@ -394,14 +343,6 @@ export default function SettingsScreen() {
             onPress={() => router.push({ pathname: "/legal", params: { doc: "support" } })}
             colors={colors}
             testID="open-support"
-          />
-          <ActionRow
-            icon="user-x"
-            label={t("settings.deleteAccount")}
-            onPress={() => router.push("/delete-account")}
-            colors={colors}
-            danger
-            testID="open-delete-account"
           />
         </CollapsibleCard>
 
@@ -506,36 +447,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.4,
   },
-  accountRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  accountName: { fontSize: 16, fontWeight: "700" },
-  backupLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  backupText: { fontSize: 12.5, fontWeight: "600", flex: 1 },
-  outlineBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 46,
-    borderRadius: 13,
-    borderWidth: 1,
-  },
-  outlineBtnText: { fontSize: 15, fontWeight: "600" },
-  googleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-    height: 52,
-    borderRadius: 14,
-  },
-  googleText: { fontSize: 16, fontWeight: "700" },
   subText: { fontSize: 13.5, lineHeight: 19 },
   collapseHeader: {
     flexDirection: "row",

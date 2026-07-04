@@ -11,18 +11,21 @@ import { OrganizedItem } from "@/src/types";
 interface Props {
   visible: boolean;
   items: OrganizedItem[];
-  source?: "ai" | "local";
+  /** split = yazılan metni böl; tidy = bekleyen notları kategorisine taşı */
+  mode: "split" | "tidy";
   onConfirm: () => void;
   onSingle: () => void;
   onCancel: () => void;
 }
 
-// "✨ Derle" önizlemesi: AI'nın önerdiği bölme kaydedilmeden ÖNCE gösterilir.
-// Kullanıcı onaylamadan hiçbir not oluşmaz — kontrol her zaman kullanıcıda.
-export function DerlePreview({ visible, items, source, onConfirm, onSingle, onCancel }: Props) {
+// "✨ Derle" önizlemesi: motorun önerisi kaydedilmeden ÖNCE gösterilir.
+// Kullanıcı onaylamadan hiçbir not oluşmaz/taşınmaz — kontrol her zaman kullanıcıda.
+export function DerlePreview({ visible, items, mode, onConfirm, onSingle, onCancel }: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+
+  const tidy = mode === "tidy";
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -41,24 +44,15 @@ export function DerlePreview({ visible, items, source, onConfirm, onSingle, onCa
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: colors.text }]}>
-              {t("preview.title")}
+              {t(tidy ? "preview.tidyTitle" : "preview.title")}
             </Text>
             <Pressable hitSlop={8} onPress={onCancel} testID="preview-close">
               <Feather name="x" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
-            {t("preview.sub", { n: items.length })}
+            {t(tidy ? "preview.tidySub" : "preview.sub", { n: items.length })}
           </Text>
-
-          {source === "local" && (
-            <View style={[styles.localNote, { backgroundColor: colors.input }]}>
-              <Feather name="wifi-off" size={13} color={colors.textMuted} />
-              <Text style={[styles.localNoteText, { color: colors.textMuted }]}>
-                {t("ai.localUsed")}
-              </Text>
-            </View>
-          )}
 
           <ScrollView
             style={styles.list}
@@ -92,19 +86,21 @@ export function DerlePreview({ visible, items, source, onConfirm, onSingle, onCa
           >
             <Feather name="check" size={19} color={colors.brandText} />
             <Text style={[styles.confirmText, { color: colors.brandText }]}>
-              {t("preview.confirm", { n: items.length })}
+              {t(tidy ? "preview.tidyConfirm" : "preview.confirm", { n: items.length })}
             </Text>
           </Pressable>
 
-          <Pressable
-            testID="preview-single"
-            onPress={onSingle}
-            style={[styles.singleBtn, { borderColor: colors.cardBorder }]}
-          >
-            <Text style={[styles.singleText, { color: colors.textSecondary }]}>
-              {t("preview.single")}
-            </Text>
-          </Pressable>
+          {!tidy && (
+            <Pressable
+              testID="preview-single"
+              onPress={onSingle}
+              style={[styles.singleBtn, { borderColor: colors.cardBorder }]}
+            >
+              <Text style={[styles.singleText, { color: colors.textSecondary }]}>
+                {t("preview.single")}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </Modal>
@@ -145,20 +141,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     marginTop: 3,
     marginBottom: 12,
-  },
-  localNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginBottom: 12,
-  },
-  localNoteText: {
-    fontSize: 12.5,
-    fontWeight: "600",
-    flexShrink: 1,
   },
   list: {
     flexGrow: 0,

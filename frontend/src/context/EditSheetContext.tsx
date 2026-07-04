@@ -15,11 +15,10 @@ import {
   StyleSheet,
   Animated,
   ScrollView,
-  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 
 import { Icon } from "@/src/components/Icon";
 import { SegmentedControl } from "@/src/components/SegmentedControl";
@@ -54,7 +53,6 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
   const [text, setText] = useState("");
   const [category, setCategory] = useState("notlar");
   const [priority, setPriority] = useState<Priority>("low");
-  const [pinned, setPinned] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const openEdit = useCallback(
@@ -63,7 +61,6 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
       setText(n.text);
       setCategory(n.category);
       setPriority(n.priority);
-      setPinned(n.pinned);
       setConfirmDelete(false);
       setMounted(true);
     },
@@ -93,8 +90,8 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
     });
   }, [progress]);
 
-  // Öncelik ve yıldız bağımsızdır: yıldız "Yakala'da göster" demek,
-  // öncelik ise o listedeki sıralamayı belirler.
+  // Acil ve Önemli notlar Yakala ekranında otomatik öne çıkar;
+  // ayrı bir "yıldız" kavramı yok.
   const save = () => {
     if (note) {
       const cleaned = text.trim();
@@ -102,7 +99,6 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
         text: cleaned.length > 0 ? cleaned : note.text,
         category,
         priority,
-        pinned,
       });
     }
     haptics.success();
@@ -235,30 +231,6 @@ export function EditSheetProvider({ children }: { children: React.ReactNode }) {
                   ]}
                 />
 
-                <Pressable
-                  testID="edit-star-toggle"
-                  onPress={() => {
-                    haptics.light();
-                    setPinned((p) => !p);
-                  }}
-                  style={[
-                    styles.starRow,
-                    {
-                      backgroundColor: pinned ? colors.brandSoft : colors.input,
-                      borderColor: pinned ? colors.brand : "transparent",
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={pinned ? "star" : "star-outline"}
-                    size={20}
-                    color={pinned ? colors.important : colors.textSecondary}
-                  />
-                  <Text style={[styles.starLabel, { color: pinned ? colors.text : colors.textSecondary }]}>
-                    {pinned ? t("edit.starred") : t("edit.star")}
-                  </Text>
-                </Pressable>
-
                 <View style={styles.actions}>
                   <Pressable
                     testID="edit-delete"
@@ -353,17 +325,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   catLabel: { fontSize: 14, fontWeight: "600" },
-  starRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    height: 52,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    marginTop: 10,
-  },
-  starLabel: { fontSize: 15.5, fontWeight: "600" },
   actions: {
     flexDirection: "row",
     alignItems: "center",

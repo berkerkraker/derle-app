@@ -1,9 +1,9 @@
-import { OrganizedItem, Priority, Lang } from "@/src/types";
+import { Note, OrganizedItem, Priority, Lang } from "@/src/types";
 
-// On-device fallback engine. Runs when the AI proxy is unreachable / the
-// budget is exhausted / there is no network. It NEVER rewrites the user's
-// words — it only splits clearly-separate lines and tags category + priority
-// by keyword. Worst case it returns the whole text as a single "notlar" note.
+// Derle motoru — tamamen cihazda çalışan kurallı sınıflandırıcı.
+// Kullanıcının kelimelerini ASLA değiştirmez: yalnızca açıkça ayrı satırları
+// böler, kategori ve öncelik etiketi önerir. Hiçbir metin cihazdan çıkmaz.
+// En kötü ihtimalle metnin tamamını tek "notlar" notu olarak döndürür.
 
 const KEYWORDS: Record<string, string[]> = {
   saglik: [
@@ -55,14 +55,15 @@ const HIGH_WORDS = [
   "urgent", "today", "now", "important", "asap",
 ];
 
-function normalize(s: string): string {
+/** Türkçe-duyarsız karşılaştırma normalizasyonu (arama da bunu kullanır). */
+export function normalizeTr(s: string): string {
   return s
     .toLocaleLowerCase("tr-TR")
     .replace(/i̇/g, "i");
 }
 
 function categorize(line: string): string {
-  const n = normalize(line);
+  const n = normalizeTr(line);
   for (const cat of CATEGORY_PRIORITY) {
     if (KEYWORDS[cat].some((w) => n.includes(w))) return cat;
   }
@@ -70,10 +71,16 @@ function categorize(line: string): string {
 }
 
 function prioritize(line: string, category: string): Priority {
-  const n = normalize(line);
+  const n = normalizeTr(line);
   if (HIGH_WORDS.some((w) => n.includes(w))) return "high";
   if (category === "gorevler") return "medium";
   return "low";
+}
+
+/** Tek satır için kategori + öncelik önerisi. */
+export function classifyLine(line: string): { category: string; priority: Priority } {
+  const category = categorize(line);
+  return { category, priority: prioritize(line, category) };
 }
 
 function splitLines(text: string): string[] {
@@ -101,9 +108,30 @@ export function organizeLocally(
 ): OrganizedItem[] {
   const clean = (text || "").trim();
   if (!clean) return [];
-  const lines = splitLines(clean);
-  return lines.map((line) => {
-    const category = categorize(line);
-    return { text: line, category, priority: prioritize(line, category) };
-  });
+  return splitLines(clean).map((line) => ({ text: line, ...classifyLine(line) }));
+}
+
+export interface TidyItem extends OrganizedItem {
+  id: string;
+}
+
+const WEIGHT: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
+
+// "Boşken Derle": kategorisiz ("notlar") bekleyen notları uygun kategoriye
+// taşımayı önerir. Yalnızca öneri üretir — uygulamak kullanıcının onayına bağlı.
+// Öncelik sadece yukarı yönlü değişir (Acil bir not asla Normal'e düşmez).
+export function tidySuggestions(notes: Note[]): TidyItem[] {
+  const out: TidyItem[] = [];
+  for (const n of notes) {
+    if (n.done || n.category !== "notlar") continue;
+    const { category, priority } = classifyLine(n.text);
+    if (category === "notlar") continue;
+    out.push({
+      id: n.id,
+      text: n.text,
+      category,
+      priority: WEIGHT[priority] > WEIGHT[n.priority] ? priority : n.priority,
+    });
+  }
+  return out;
 }

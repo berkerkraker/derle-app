@@ -7,14 +7,15 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AppState } from "react-native";
 
 import { storage } from "@/src/utils/storage";
-import { api } from "@/src/lib/api";
-import { organizeLocally } from "@/src/lib/localOrganize";
+import {
+  organizeLocally,
+  tidySuggestions,
+  TidyItem,
+} from "@/src/lib/localOrganize";
 import { CATEGORIES } from "@/src/constants/categories";
 import { Note, CustomCategory, Priority, OrganizedItem } from "@/src/types";
-import { useAuth } from "@/src/context/AuthContext";
 import { useI18n } from "@/src/i18n/I18nContext";
 
 const NOTES_KEY = "derle.notes";
@@ -29,24 +30,18 @@ export interface AddResult {
   categories: string[];
 }
 
-export interface OrganizePreview {
-  source: "ai" | "local";
-  items: OrganizedItem[];
-}
-
 interface NotesContextValue {
   notes: Note[];
   ready: boolean;
-  processing: boolean;
-  syncing: boolean;
   customCategories: CustomCategory[];
   addManual: (text: string, categoryId?: string) => AddResult;
-  previewOrganize: (text: string) => Promise<OrganizePreview>;
+  previewOrganize: (text: string) => OrganizedItem[];
   addOrganized: (items: OrganizedItem[]) => AddResult;
+  tidyInbox: () => TidyItem[];
+  applyTidy: (items: TidyItem[]) => number;
   updateNote: (id: string, patch: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   toggleDone: (id: string) => void;
-  togglePinned: (id: string) => void;
   addCustomCategory: (label: string, color: string) => void;
   removeCustomCategory: (id: string) => void;
   exportJSON: () => string;
@@ -57,22 +52,33 @@ interface NotesContextValue {
 const NotesContext = createContext<NotesContextValue>({} as NotesContextValue);
 export const useNotes = () => useContext(NotesContext);
 
+// v1.2 → v1.3: yıldız kavramı kalktı. Yıldızlanmış Normal notlar Önemli'ye
+// yükseltilir ki ana ekrandan sessizce kaybolmasınlar. İkinci çalıştırma
+// hiçbir şey değiştirmez (pinned kalmayınca dokunulmaz).
+function migrateStars(parsed: Note[]): { notes: Note[]; changed: boolean } {
+  let changed = false;
+  const notes = parsed.map((n) => {
+    if (!n.pinned) return n;
+    changed = true;
+    return {
+      ...n,
+      pinned: false,
+      priority:
+        n.priority === "low" && !n.done ? ("medium" as Priority) : n.priority,
+    };
+  });
+  return { notes, changed };
+}
+
 export function NotesProvider({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
   const { lang } = useI18n();
 
   const [all, setAll] = useState<Note[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [ready, setReady] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   const allRef = useRef<Note[]>([]);
-  const tokenRef = useRef<string | null>(null);
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   allRef.current = all;
-  tokenRef.current = token;
 
   // ---- persistence ---------------------------------------------------------
   const persist = useCallback((next: Note[]) => {
@@ -88,8 +94,10 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsed = JSON.parse(raw as string) as Note[];
           if (Array.isArray(parsed)) {
-            setAll(parsed);
-            allRef.current = parsed;
+            const { notes: migrated, changed } = migrateStars(parsed);
+            setAll(migrated);
+            allRef.current = migrated;
+            if (changed) storage.setItem(NOTES_KEY, JSON.stringify(migrated));
           }
         } catch {
           /* ignore corrupt */
@@ -108,42 +116,6 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  // ---- cloud sync ----------------------------------------------------------
-  const pushSync = useCallback(async () => {
-    const tk = tokenRef.current;
-    if (!tk) return;
-    setSyncing(true);
-    try {
-      const res = await api.syncNotes(tk, allRef.current);
-      if (res?.notes && Array.isArray(res.notes)) {
-        allRef.current = res.notes;
-        setAll(res.notes);
-        storage.setItem(NOTES_KEY, JSON.stringify(res.notes));
-      }
-    } finally {
-      setSyncing(false);
-    }
-  }, []);
-
-  const scheduleSync = useCallback(() => {
-    if (!tokenRef.current) return;
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => pushSync(), 1200);
-  }, [pushSync]);
-
-  // pull + merge when the user signs in (or token changes)
-  useEffect(() => {
-    if (token) pushSync();
-  }, [token, pushSync]);
-
-  // sync when app returns to foreground
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active" && tokenRef.current) pushSync();
-    });
-    return () => sub.remove();
-  }, [pushSync]);
-
   // ---- mutations -----------------------------------------------------------
   const persistCustom = useCallback((next: CustomCategory[]) => {
     setCustomCategories(next);
@@ -151,7 +123,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Not ekleme = anında ve öngörülebilir: kullanıcının seçtiği kategoriye tek
-  // not olarak kaydedilir. AI hiçbir zaman kendiliğinden bölmez/taşımaz.
+  // not olarak kaydedilir. Motor hiçbir zaman kendiliğinden bölmez/taşımaz.
   const addManual = useCallback(
     (text: string, categoryId?: string): AddResult => {
       const clean = (text || "").trim();
@@ -164,7 +136,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         text: clean,
         category,
         priority: "low",
-        pinned: false, // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
+        pinned: false,
         done: false,
         createdAt: now,
         updatedAt: now,
@@ -173,37 +145,21 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
       };
 
       persist([note, ...allRef.current]);
-      scheduleSync();
       return { count: 1, categories: [category] };
     },
-    [persist, scheduleSync],
+    [persist],
   );
 
-  // "✨ Derle" butonu: AI'dan bölme ÖNERİSİ alır, hiçbir şey kaydetmez.
-  // Kullanıcı önizlemeyi onaylamadan not oluşmaz. AI yoksa cihazdaki kurallı
-  // motor öneri üretir — buton asla ölü kalmaz, metin asla kaybolmaz.
+  // "✨ Derle" (metinle): cihazdaki motordan bölme ÖNERİSİ alır, hiçbir şey
+  // kaydetmez. Kullanıcı önizlemeyi onaylamadan not oluşmaz.
   const previewOrganize = useCallback(
-    async (text: string): Promise<OrganizePreview> => {
+    (text: string): OrganizedItem[] => {
       const clean = (text || "").trim();
-      if (!clean) return { source: "local", items: [] };
-
-      setProcessing(true);
-      try {
-        const res = await api.organize(clean, lang);
-        if (res.source === "ai" && res.items?.length) {
-          return { source: "ai", items: res.items };
-        }
-      } catch {
-        /* fall through to local */
-      } finally {
-        setProcessing(false);
-      }
-
-      let local = organizeLocally(clean, lang);
-      if (!local || local.length === 0) {
-        local = [{ text: clean, category: "notlar", priority: "low" as Priority }];
-      }
-      return { source: "local", items: local };
+      if (!clean) return [];
+      const items = organizeLocally(clean, lang);
+      return items.length
+        ? items
+        : [{ text: clean, category: "notlar", priority: "low" as Priority }];
     },
     [lang],
   );
@@ -226,22 +182,46 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         text: it.text.trim(),
         category: known.has(it.category) ? it.category : "notlar",
         priority: (it.priority as Priority) || "low",
-        pinned: false, // kullanıcı manuel yıldızlayana kadar hiç bir not yıldızlı olmaz
+        pinned: false,
         done: false,
         createdAt: now + idx,
         updatedAt: now + idx,
         deleted: false,
-        source: "ai",
+        source: "local",
       }));
 
       persist([...created, ...allRef.current]);
-      scheduleSync();
       return {
         count: created.length,
         categories: Array.from(new Set(created.map((n) => n.category))),
       };
     },
-    [customCategories, persist, scheduleSync],
+    [customCategories, persist],
+  );
+
+  // "✨ Derle" (kutu boşken): Notlar'da bekleyen kategorisiz notlar için
+  // taşıma önerileri. Uygulamak applyTidy + kullanıcı onayı ister.
+  const tidyInbox = useCallback(
+    (): TidyItem[] => tidySuggestions(allRef.current.filter((n) => !n.deleted)),
+    [],
+  );
+
+  const applyTidy = useCallback(
+    (items: TidyItem[]): number => {
+      if (!items.length) return 0;
+      const byId = new Map(items.map((i) => [i.id, i]));
+      const now = Date.now();
+      let moved = 0;
+      const next = allRef.current.map((n) => {
+        const s = byId.get(n.id);
+        if (!s) return n;
+        moved += 1;
+        return { ...n, category: s.category, priority: s.priority, updatedAt: now };
+      });
+      persist(next);
+      return moved;
+    },
+    [persist],
   );
 
   const updateNote = useCallback(
@@ -250,9 +230,8 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         n.id === id ? { ...n, ...patch, updatedAt: Date.now() } : n,
       );
       persist(next);
-      scheduleSync();
     },
-    [persist, scheduleSync],
+    [persist],
   );
 
   const deleteNote = useCallback(
@@ -261,9 +240,8 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         n.id === id ? { ...n, deleted: true, updatedAt: Date.now() } : n,
       );
       persist(next);
-      scheduleSync();
     },
-    [persist, scheduleSync],
+    [persist],
   );
 
   const toggleDone = useCallback(
@@ -272,20 +250,8 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         n.id === id ? { ...n, done: !n.done, updatedAt: Date.now() } : n,
       );
       persist(next);
-      scheduleSync();
     },
-    [persist, scheduleSync],
-  );
-
-  const togglePinned = useCallback(
-    (id: string) => {
-      const next = allRef.current.map((n) =>
-        n.id === id ? { ...n, pinned: !n.pinned, updatedAt: Date.now() } : n,
-      );
-      persist(next);
-      scheduleSync();
-    },
-    [persist, scheduleSync],
+    [persist],
   );
 
   const addCustomCategory = useCallback(
@@ -310,9 +276,8 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         n.category === id ? { ...n, category: "notlar", updatedAt: Date.now() } : n,
       );
       persist(next);
-      scheduleSync();
     },
-    [customCategories, persistCustom, persist, scheduleSync],
+    [customCategories, persistCustom, persist],
   );
 
   const exportJSON = useCallback(() => {
@@ -336,7 +301,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
           text: n.text,
           category: n.category || "notlar",
           priority: (n.priority as Priority) || "low",
-          pinned: !!n.pinned,
+          pinned: false,
           done: !!n.done,
           createdAt: typeof n.createdAt === "number" ? n.createdAt : Date.now(),
           updatedAt: Date.now(),
@@ -347,10 +312,9 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
         map.set(id, note);
       }
       persist(Array.from(map.values()));
-      scheduleSync();
       return added;
     },
-    [persist, scheduleSync],
+    [persist],
   );
 
   const clearLocal = useCallback(() => {
@@ -360,8 +324,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
       updatedAt: Date.now(),
     }));
     persist(next);
-    scheduleSync();
-  }, [persist, scheduleSync]);
+  }, [persist]);
 
   const notes = useMemo(() => all.filter((n) => !n.deleted), [all]);
 
@@ -369,16 +332,15 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
     () => ({
       notes,
       ready,
-      processing,
-      syncing,
       customCategories,
       addManual,
       previewOrganize,
       addOrganized,
+      tidyInbox,
+      applyTidy,
       updateNote,
       deleteNote,
       toggleDone,
-      togglePinned,
       addCustomCategory,
       removeCustomCategory,
       exportJSON,
@@ -388,16 +350,15 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
     [
       notes,
       ready,
-      processing,
-      syncing,
       customCategories,
       addManual,
       previewOrganize,
       addOrganized,
+      tidyInbox,
+      applyTidy,
       updateNote,
       deleteNote,
       toggleDone,
-      togglePinned,
       addCustomCategory,
       removeCustomCategory,
       exportJSON,
@@ -416,10 +377,10 @@ export function priorityWeight(n: Note): number {
   return WEIGHT[n.priority] ?? 1;
 }
 
-/** Capture-screen list: notes pinned to priority, not done, sorted by urgency. */
+/** Yakala vitrini: bitmemiş Acil + Önemli notlar, acilden başlayarak. */
 export function selectPriorityNotes(notes: Note[]): Note[] {
   return notes
-    .filter((n) => !n.done && n.pinned)
+    .filter((n) => !n.done && (n.priority === "high" || n.priority === "medium"))
     .sort((a, b) => {
       const w = priorityWeight(b) - priorityWeight(a);
       if (w !== 0) return w;
