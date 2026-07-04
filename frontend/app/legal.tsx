@@ -28,8 +28,8 @@ VERİLERİN SİLİNMESİ
 • Ayarlar → "Bu cihazdaki notları sil" ile tüm notlarını silebilirsin. Uygulamayı kaldırmak da tüm veriyi kaldırır.
 
 İLETİŞİM
-• support@yamanlabs.app
-• https://yamanlabs.app/privacy`,
+• m.canyaman1241@gmail.com
+• https://berkerkraker.github.io/derle-app/privacy.html`,
     },
     en: {
       title: "Privacy Policy",
@@ -50,8 +50,8 @@ DATA DELETION
 • Settings → "Delete notes on this device" removes all your notes. Uninstalling the app also removes all data.
 
 CONTACT
-• support@yamanlabs.app
-• https://yamanlabs.app/privacy`,
+• m.canyaman1241@gmail.com
+• https://berkerkraker.github.io/derle-app/privacy.html`,
     },
   },
   terms: {
@@ -66,7 +66,7 @@ CONTACT
 • Notlar cihazında saklanır; cihazın kaybı/sıfırlanması durumunda yedeğin yoksa notlar geri getirilemez.
 • Bu koşullar zaman zaman güncellenebilir.
 
-İletişim: support@yamanlabs.app`,
+İletişim: m.canyaman1241@gmail.com`,
     },
     en: {
       title: "Terms of Use",
@@ -79,7 +79,7 @@ CONTACT
 • Notes are stored on your device; if the device is lost or reset and you have no backup, notes cannot be recovered.
 • These terms may be updated from time to time.
 
-Contact: support@yamanlabs.app`,
+Contact: m.canyaman1241@gmail.com`,
     },
   },
   support: {
@@ -87,8 +87,8 @@ Contact: support@yamanlabs.app`,
       title: "Destek",
       body: `Sorularını, geri bildirimlerini ve hata bildirimlerini bekliyoruz.
 
-E-posta: support@yamanlabs.app
-Web: https://yamanlabs.app/support
+E-posta: m.canyaman1241@gmail.com
+Web: https://berkerkraker.github.io/derle-app/destek.html
 
 Sık sorulanlar:
 • Notlarım nerede saklanıyor? Yalnızca cihazında. Hesap ve bulut yoktur.
@@ -100,8 +100,8 @@ Sık sorulanlar:
       title: "Support",
       body: `We welcome your questions, feedback and bug reports.
 
-Email: support@yamanlabs.app
-Web: https://yamanlabs.app/support
+Email: m.canyaman1241@gmail.com
+Web: https://berkerkraker.github.io/derle-app/destek.html
 
 FAQ:
 • Where are my notes stored? Only on your device. There is no account or cloud.

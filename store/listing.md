@@ -59,5 +59,5 @@ Verimlilik (Productivity)
 - İçerik derecelendirmesi: her soruya Hayır → "Herkes / PEGI 3"
 - Reklam içerir mi? → Hayır
 - Hedef kitle: 13+ (çocuklara yönelik değil)
-- Gizlilik politikası URL'i: https://yamanlabs.app/privacy (yayında OLMALI — zorunlu alan)
+- Gizlilik politikası URL'i: https://berkerkraker.github.io/derle-app/privacy.html (CANLI ✔)
 - Uygulama erişimi: "Tüm işlevler kısıtlamasız erişilebilir" (hesap yok)
