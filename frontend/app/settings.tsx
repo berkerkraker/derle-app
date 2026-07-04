@@ -41,6 +41,7 @@ export default function SettingsScreen() {
   } = useNotes();
   const { show } = useToast();
 
+  const [addingCat, setAddingCat] = useState(false);
   const [catName, setCatName] = useState("");
   const [catColor, setCatColor] = useState(CUSTOM_COLOR_CHOICES[0]);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -113,6 +114,7 @@ export default function SettingsScreen() {
     addCustomCategory(catName.trim(), catColor);
     setCatName("");
     setCatColor(CUSTOM_COLOR_CHOICES[0]);
+    setAddingCat(false);
     haptics.success();
   };
 
@@ -200,73 +202,89 @@ export default function SettingsScreen() {
 
         {/* KATEGORİLER */}
         <SectionLabel colors={colors} text={t("settings.secCats")} />
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          {customCategories.length === 0 ? (
-            <Text style={[styles.subText, { color: colors.textMuted }]}>
-              {t("settings.noCustom")}
+        <View style={[styles.card, styles.cardTight, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          {customCategories.map((c) => (
+            <View key={c.id}>
+              <View style={styles.actionRow}>
+                <View style={[styles.dot, { backgroundColor: c.color }]} />
+                <Text style={[styles.actionLabel, { color: colors.text }]} numberOfLines={1}>
+                  {c.label}
+                </Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    haptics.warning();
+                    removeCustomCategory(c.id);
+                  }}
+                  testID={`remove-cat-${c.id}`}
+                >
+                  <Feather name="trash-2" size={17} color={colors.danger} />
+                </Pressable>
+              </View>
+              <RowDivider colors={colors} />
+            </View>
+          ))}
+
+          {/* Ekleme akışı gizli başlar: renk paleti ortalıkta durmasın */}
+          <Pressable
+            testID="new-cat-toggle"
+            style={({ pressed }) => [styles.actionRow, pressed && { opacity: 0.55 }]}
+            onPress={() => {
+              haptics.light();
+              setAddingCat((v) => !v);
+            }}
+          >
+            <IconTile icon={addingCat ? "x" : "plus"} colors={colors} />
+            <Text style={[styles.actionLabel, { color: colors.text }]}>
+              {t("settings.newCategory")}
             </Text>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {customCategories.map((c) => (
-                <View key={c.id} style={styles.customRow}>
-                  <View style={[styles.dot, { backgroundColor: c.color }]} />
-                  <Text style={[styles.customLabel, { color: colors.text }]} numberOfLines={1}>
-                    {c.label}
-                  </Text>
+            <Text style={[styles.rowValue, { color: colors.textMuted }]}>
+              {customCategories.length === 0 && !addingCat ? t("settings.noCustom") : ""}
+            </Text>
+          </Pressable>
+
+          {addingCat && (
+            <View style={styles.addCatWrap}>
+              <TextInput
+                testID="custom-cat-input"
+                value={catName}
+                onChangeText={setCatName}
+                autoFocus
+                placeholder={t("settings.categoryName")}
+                placeholderTextColor={colors.textMuted}
+                style={[styles.catInput, { backgroundColor: colors.input, color: colors.inputText }]}
+              />
+              <View style={styles.colorRow}>
+                {CUSTOM_COLOR_CHOICES.map((c) => (
                   <Pressable
-                    hitSlop={8}
+                    key={c}
+                    testID={`cat-color-${c}`}
                     onPress={() => {
-                      haptics.warning();
-                      removeCustomCategory(c.id);
+                      haptics.selection();
+                      setCatColor(c);
                     }}
-                    testID={`remove-cat-${c.id}`}
-                  >
-                    <Feather name="trash-2" size={17} color={colors.danger} />
-                  </Pressable>
-                </View>
-              ))}
+                    style={[
+                      styles.colorDot,
+                      {
+                        backgroundColor: c,
+                        borderColor: catColor === c ? colors.text : "transparent",
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              <Pressable
+                testID="add-cat-button"
+                onPress={onAddCat}
+                style={[styles.smallBtn, { backgroundColor: colors.brand }]}
+              >
+                <Feather name="plus" size={16} color={colors.brandText} />
+                <Text style={[styles.smallBtnText, { color: colors.brandText }]}>
+                  {t("settings.addCategory")}
+                </Text>
+              </Pressable>
             </View>
           )}
-
-          <View style={styles.addCatWrap}>
-            <TextInput
-              testID="custom-cat-input"
-              value={catName}
-              onChangeText={setCatName}
-              placeholder={t("settings.categoryName")}
-              placeholderTextColor={colors.textMuted}
-              style={[styles.catInput, { backgroundColor: colors.input, color: colors.inputText }]}
-            />
-            <View style={styles.colorRow}>
-              {CUSTOM_COLOR_CHOICES.map((c) => (
-                <Pressable
-                  key={c}
-                  testID={`cat-color-${c}`}
-                  onPress={() => {
-                    haptics.selection();
-                    setCatColor(c);
-                  }}
-                  style={[
-                    styles.colorDot,
-                    {
-                      backgroundColor: c,
-                      borderColor: catColor === c ? colors.text : "transparent",
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-            <Pressable
-              testID="add-cat-button"
-              onPress={onAddCat}
-              style={[styles.smallBtn, { backgroundColor: colors.brand }]}
-            >
-              <Feather name="plus" size={16} color={colors.brandText} />
-              <Text style={[styles.smallBtnText, { color: colors.brandText }]}>
-                {t("settings.addCategory")}
-              </Text>
-            </Pressable>
-          </View>
         </View>
 
         {/* YEDEK */}
@@ -489,7 +507,7 @@ const styles = StyleSheet.create({
   customRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
   dot: { width: 12, height: 12, borderRadius: 6 },
   customLabel: { flex: 1, fontSize: 15, fontWeight: "500" },
-  addCatWrap: { marginTop: 10, gap: 10 },
+  addCatWrap: { marginTop: 6, marginBottom: 12, gap: 10 },
   catInput: {
     height: 46,
     borderRadius: 12,

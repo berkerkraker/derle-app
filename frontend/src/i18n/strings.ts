@@ -73,7 +73,8 @@ const tr: Dict = {
   "settings.version": "Sürüm",
   "settings.addCategory": "Kategori ekle",
   "settings.categoryName": "Kategori adı",
-  "settings.noCustom": "Henüz özel kategori yok.",
+  "settings.noCustom": "Henüz yok",
+  "settings.newCategory": "Yeni kategori",
 
   "edit.title": "Notu düzenle",
   "edit.category": "Kategori",
@@ -179,7 +180,8 @@ const en: Dict = {
   "settings.version": "Version",
   "settings.addCategory": "Add category",
   "settings.categoryName": "Category name",
-  "settings.noCustom": "No custom categories yet.",
+  "settings.noCustom": "None yet",
+  "settings.newCategory": "New category",
 
   "edit.title": "Edit note",
   "edit.category": "Category",

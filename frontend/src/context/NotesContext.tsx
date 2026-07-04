@@ -10,6 +10,7 @@ import React, {
 
 import { storage } from "@/src/utils/storage";
 import {
+  classifyLine,
   organizeLocally,
   tidySuggestions,
   TidyItem,
@@ -129,13 +130,16 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
       const clean = (text || "").trim();
       if (!clean) return { count: 0, categories: [] };
 
-      const category = categoryId || "notlar";
+      // Çip seçilmediyse Derle Zekâsı yerleştirir: "her şey Notlar'a gidiyor"
+      // diye kategori öğrenmek zorunda kalmasın kimse. Çip seçimi motoru ezer.
+      const auto = categoryId ? null : classifyLine(clean);
+      const category = categoryId || auto?.category || "notlar";
       const now = Date.now();
       const note: Note = {
         id: uid(),
         text: clean,
         category,
-        priority: "low",
+        priority: auto?.priority ?? "low",
         pinned: false,
         done: false,
         createdAt: now,
